@@ -22,7 +22,7 @@ int main(int argc, char const *argv[]){
     memset(&stSockAddr, 0, sizeof(struct sockaddr_in));
  
     stSockAddr.sin_family = AF_INET;
-    stSockAddr.sin_port = htons(5555);
+    stSockAddr.sin_port = htons(1055);
     Res = inet_pton(AF_INET, "127.0.0.1", &stSockAddr.sin_addr);
  
     if (0 > Res){
@@ -42,24 +42,23 @@ int main(int argc, char const *argv[]){
         exit(1);
     }
 
+    std::cout << "Client Connected\n";
+
     int buffer_size = 256;
     char buffer[buffer_size];
 
     std::string text = "";
     do{
         bzero(buffer,buffer_size);                      // pull zero to the buffer
-        std::cout << "[Client]:\t";
+        std::cout << "[Client]: ";
         getline(std::cin, text);
 
         n = write(SocketFD, text.c_str(), text.size()+1);
 
         n = read(SocketFD, buffer, buffer_size-1);
         printf("[Server]: %s\n",buffer);
-
-    } while(text != "bye");    
- 
-    shutdown(SocketFD, SHUT_RDWR);
- 
+    } while(text != "END");
+    
     close(SocketFD);
     return 0;
   }

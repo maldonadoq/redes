@@ -23,7 +23,7 @@ int main(int argc, char const *argv[]){
     memset(&stSockAddr, 0, sizeof(struct sockaddr_in));
  
     stSockAddr.sin_family = AF_INET;
-    stSockAddr.sin_port = htons(5555);
+    stSockAddr.sin_port = htons(1055);
     stSockAddr.sin_addr.s_addr = INADDR_ANY;
 	
 	// Validate bind socket address
@@ -40,35 +40,32 @@ int main(int argc, char const *argv[]){
 		exit(1);
     }
 
+    int ConnectFD = accept(SocketFD, NULL, NULL);
+	if(0 > ConnectFD){
+    	perror("Error accept failed");
+    	close(SocketFD);
+    	exit(0);
+	}
+
  	std::string text = "";
-    do{
-		int ConnectFD = accept(SocketFD, NULL, NULL);
- 
-		if(0 > ConnectFD){
-        	perror("Error accept failed");
-        	close(SocketFD);
-        	exit(0);
-		}
- 
- 
+ 	std::cout << "Server Created\n";
+    do{ 
 		bzero(buffer,buffer_size);						// put zero to the buffer
-		n = read(ConnectFD, buffer, buffer_size-1);		// read msg in the buffer
+		n = read(ConnectFD, buffer, buffer_size+1);		// read msg in the buffer
 
 		if (n < 0)		
 			perror("ERROR reading from socket");
 		
 		printf("[Client]: %s\n",buffer);
 
-		std::cout << "[Server]:\t";
-		getline(std::cin, text);		
+		std::cout << "[Server]: ";
+		getline(std::cin, text);
 
 		n = write(ConnectFD, text.c_str(), text.size()+1);
 		if (n < 0) perror("ERROR writing to socket");
- 
-		shutdown(ConnectFD, SHUT_RDWR);
- 		close(ConnectFD);
-    } while(text != "bye");
+    } while(text != "END");
 
+    close(ConnectFD);
     close(SocketFD);
 
 	return 0;
