@@ -6,7 +6,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <thread>
+#include <chrono>
 #include <iostream>
+#include "src/read-write.h"
 
 int main(int argc, char const *argv[]){
     struct sockaddr_in stSockAddr;
@@ -44,19 +47,11 @@ int main(int argc, char const *argv[]){
 
     std::cout << "Client Connected\n";
 
-    int buffer_size = 256;
-    char buffer[buffer_size];
+    std::thread twrite(&thread_write, SocketFD);
+    std::thread tread(&thread_read, SocketFD);
 
-    std::string text = "";
-    do{
-        bzero(buffer,buffer_size);                      // pull zero to the buffer
-        std::cout << "[Client]: ";
-        getline(std::cin, text);
-        n = write(SocketFD, text.c_str(), text.size()+1);
-
-        n = read(SocketFD, buffer, buffer_size-1);
-        printf("[Server]: %s\n",buffer);
-    } while(text != "END");
+    twrite.join();
+    tread.join();    
     
     close(SocketFD);
     return 0;
