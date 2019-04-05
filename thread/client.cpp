@@ -47,11 +47,8 @@ int main(int argc, char const *argv[]){
 
     std::cout << "Client Connected\n";
 
-    std::thread twrite(&thread_write, SocketFD);
-    std::thread tread(&thread_read, SocketFD);
-
-    twrite.join();
-    tread.join();    
+    std::thread twrite_read(&thread_write_read, SocketFD);
+    twrite_read.join();
     
     close(SocketFD);
     return 0;

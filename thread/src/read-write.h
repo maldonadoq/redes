@@ -32,4 +32,39 @@ void thread_read(int _sockFD){
 	}
 }
 
+void thread_read_write(int _sockFD){
+	std::string text;
+	unsigned buffer_size = 256;
+	char buffer[buffer_size];
+
+	while(true){
+		std::this_thread::sleep_for(std::chrono::milliseconds(10000));
+		if(read(_sockFD, buffer, buffer_size) > 0){			
+			printf("< %s\n",buffer);
+
+			std::cout << "> ";
+			getline(std::cin, text);
+			if(write(_sockFD, text.c_str(), text.size()) < 0){
+				perror("Error writing data");
+			}
+		}		
+	}
+}
+
+void thread_write_read(int _sockFD){
+	std::string text;
+	unsigned buffer_size = 256;
+	char buffer[buffer_size];
+
+	while(true){
+		std::cout << "> ";
+		getline(std::cin, text);
+		if(write(_sockFD, text.c_str(), text.size()) > 0){
+			std::this_thread::sleep_for(std::chrono::milliseconds(10000));
+			if(read(_sockFD, buffer, buffer_size) > 0)
+				printf("< %s\n",buffer);
+		}		
+	}	
+}
+
 #endif

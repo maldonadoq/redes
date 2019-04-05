@@ -42,14 +42,15 @@ int main(int argc, char const *argv[]){
  	std::cout << "Server Created\n";
     while(true){
     	int ClientFD = accept(SocketFD, NULL, NULL);
+    	std::cout << "Accept\n";
 		if(0 > ClientFD){
 	    	perror("Error accept failed");
 	    	close(SocketFD);
 	    	exit(0);
 		}
 		else{
-			std::thread tread(&thread_read, ClientFD);
-			std::thread twrite(&thread_write, ClientFD);			
+			std::thread tread_write(&thread_read_write, ClientFD);
+			// std::thread twrite(&thread_write, ClientFD);			
 		}
     }
     close(SocketFD);
