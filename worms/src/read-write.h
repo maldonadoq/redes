@@ -4,24 +4,45 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
+#include <chrono>
+#include <thread>
+
+#include "utils.h"
+
+static char DIR = 'd';
 
 void thread_write(int _sockFD){
 	std::string text;
 
 	while(true){
 		getline(std::cin, text);
+		// send(_sockFD, text.c_str(), text.size(), 0);
+		DIR = text[0];
+	}
+}
+
+void thread_write_speed(int _sockFD, int _speed){
+	std::string text;
+
+	while(true){
+		// sleep(_speed);
+		std::this_thread::sleep_for(std::chrono::milliseconds(_speed));
+		
+		text = std::string(1, DIR);
 		send(_sockFD, text.c_str(), text.size(), 0);
 	}
 }
 
-void thread_read(int _sockFD){
-	unsigned buffer_size = 256;
+void thread_read(int _sockFD, unsigned _rsize, unsigned _csize){
+	unsigned buffer_size = _rsize*_csize;
 	char buffer[buffer_size];
-    
+
 	while(true){
 		memset(&buffer, 0, buffer_size);
-		if(recv(_sockFD, buffer, buffer_size, 0) > 0)
-			printf("%s\n",buffer);
+		if(recv(_sockFD, buffer, buffer_size, 0) > 0){
+			system("clear");			
+			print_table_from_str(std::string(buffer),_rsize,_csize);
+		}
 	}
 }
 
