@@ -8,12 +8,14 @@ public:
 	std::string m_name;
 	int m_id;
 	int m_sock;
+	char m_avatar;
 
 	TData();
 	~TData(){	};
 
 	void SetName(std::string);
-	void SetId(int );
+	void SetId(int);
+	void SetAvatar(char);
 };
 
 TData::TData(){
@@ -26,6 +28,10 @@ void TData::SetName(std::string _name){
 
 void TData::SetId(int _id){
 	this->m_id = _id;
+}
+
+void TData::SetAvatar(char _avatar){
+	this->m_avatar = _avatar;
 }
 
 #endif
