@@ -14,7 +14,7 @@ public:
 	TThread();
 	~TThread();
 
-	bool Create(void *, void*);
+	bool Create(void *, void *);
 	bool Join();
 
 	static bool InitMutex();
@@ -28,9 +28,9 @@ TThread::TThread(){
 
 }
 
-bool TThread::Create(void *callback, void * args){
+bool TThread::Create(void *callback, void * arg){
 
-	pthread_create(&this->m_tid, NULL, (void *(*)(void *))callback, args);
+	pthread_create(&this->m_tid, NULL, (void *(*)(void *))callback, arg);
 	return true;
 }
 
