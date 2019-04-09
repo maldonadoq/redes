@@ -9,6 +9,9 @@
 #include <thread>
 #include "read-write.h"
 
+extern unsigned rsize;
+extern unsigned csize;
+
 class TClient{
 private:
 	int m_clientSock;
@@ -16,7 +19,7 @@ private:
 public:
 	TClient();
 	void Connect(std::string, int);
-	void Talking();
+	void Talking(int);
 };
 
 TClient::TClient(){
@@ -55,14 +58,37 @@ void TClient::Connect(std::string _ip, int _port){
     std::cout << "Client Connected\n";
 }
 
-void TClient::Talking(){
+void TClient::Talking(int _speed){
     std::cout << "Talking\n";
 
-    std::thread tread(thread_read,   m_clientSock);
+    std::string text;
+    bool t = true;
+
+    unsigned buffer_size = 2;
+	char buffer[buffer_size];
+
+	while(t){
+		getline(std::cin, text);
+		send(m_clientSock, text.c_str(), text.size(), 0);
+		
+		if(recv(m_clientSock, buffer, buffer_size, 0) > 0){
+			if(buffer[0] == '1'){
+				std::cout << "Connected\n";
+				t = false;
+			}
+			else if(buffer[0] == '0'){
+				std::cout << "This avatar already exist!\n";
+			}
+		}
+	}
+
+    std::thread tread(thread_read,   m_clientSock, rsize, csize);
     std::thread twrite(thread_write, m_clientSock);
+    std::thread twrites(thread_write_speed, m_clientSock, _speed);
 
     tread.join();
     twrite.join();
+    twrites.join();
 
     close(m_clientSock);
 }
