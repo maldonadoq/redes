@@ -19,7 +19,7 @@ int main(int argc, char const *argv[]){
  
     if (-1 == SocketFD){
         perror("Can not create socket");
-        exit(1);
+        exit(0);
     }
  
     memset(&stSockAddr, 0, sizeof(struct sockaddr_in));
