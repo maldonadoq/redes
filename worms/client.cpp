@@ -6,7 +6,7 @@ unsigned csize = 50;
 
 int main(int argc, char const *argv[]){
 		
-	std::string ip = "192.168.1.41";	
+	std::string ip = "192.168.164.35";	
 	int port = 8888;
 	int speed = 750;
 
