@@ -31,7 +31,7 @@ private:
 	static void SendToAll(std::string);
 	static int  FindClientIdx(TData *);
 	static bool IsAvatarUsed(char);
-	static void UpdateTable();
+	static void UpdateTable(int);
 	static void ClearTable();	
 	static int  IsFruit(int, int);
 public:
@@ -157,7 +157,7 @@ int TServer::IsFruit(int _r, int _c){
 	return -1;
 }
 
-void TServer::UpdateTable(){
+void TServer::UpdateTable(int _idx){
 	unsigned i, j;
 
 	ClearTable();
@@ -165,8 +165,6 @@ void TServer::UpdateTable(){
 	for(i=0; i<m_fruits.size(); i++)
 		m_table[m_fruits[i].first][m_fruits[i].second] = '*';
 
-	char t;
-	int idx;
 	std::pair<int, int> tmp;
 	for(i=0; i<m_worms.size(); i++){
 		tmp = m_worms[i].m_head;
@@ -177,24 +175,24 @@ void TServer::UpdateTable(){
 		// m_table[m_worms[i].m_head.first][m_worms[i].m_head.second] = 'O';
 	}
 
+	int itm;
 	int s;
-	for(i=0; i<m_worms.size(); i++){
-		tmp = m_worms[i].m_head;
-		idx = IsFruit(tmp.first, tmp.second);
 
-		if(idx >= 0){
-			TServer::m_fruits.erase(TServer::m_fruits.begin()+idx);
-			m_worms[i].Grow(tmp.first, tmp.second);
-		}
+	tmp = m_worms[_idx].m_head;
+	itm = IsFruit(tmp.first, tmp.second);
 
-		for(j=0; j<m_worms.size(); j++){
-			if(i!=j){
-				if(m_worms[j].IsThere(tmp.first, tmp.second)){					
-					s = m_worms[j].RemoveBody();					
-					m_worms[i].AddQueue(s);
-					std::cout << m_clients[i].m_avatar << " eats " << s << " tails of " << m_clients[j].m_avatar << "\n";
-					break;
-				}
+	if(itm >= 0){
+		TServer::m_fruits.erase(TServer::m_fruits.begin()+itm);
+		m_worms[_idx].Grow(tmp.first, tmp.second);
+	}
+
+	for(j=0; j<m_worms.size(); j++){
+		if(_idx!=j){
+			if(m_worms[j].IsThere(tmp.first, tmp.second)){					
+				s = m_worms[j].RemoveBody();					
+				m_worms[_idx].AddQueue(s);
+				std::cout << m_clients[_idx].m_avatar << " eats " << s << " tails of " << m_clients[j].m_avatar << "\n";
+				break;
 			}
 		}
 	}
@@ -276,7 +274,7 @@ void *TServer::HandleClient(void *_args){
 		else{
 			idx = TServer::FindClientIdx(cli);
 			m_worms[idx].Move(buffer[0], m_rsize, m_csize);
-			TServer::UpdateTable();
+			TServer::UpdateTable(idx);
 			text = table_to_str(m_table, m_rsize, m_csize);
 			TServer::SendToAll(text);
 		}
