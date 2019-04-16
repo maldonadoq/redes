@@ -1,6 +1,7 @@
 #include <iostream>
 #include "src/server.h"
 
+// build g++ -std=c++11 -pthread server.cpp -o server.out
 int main(int argc, char const *argv[]){
 	int port = 8888;
 	unsigned rsize = 10;
