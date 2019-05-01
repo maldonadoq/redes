@@ -9,8 +9,13 @@ int main(int argc, char const *argv[]){
 	int port = 8888;		// port to clients
 	TServer *s = new TServer();
 
+	s->CreateTable();
 	s->Connect(port);
-	s->Listening();
+
+	std::thread tlistening(TServer::Listening);
+	std::thread tsending(TServer::Send);
+
+	tlistening.join();
 
 	delete s;
 	return 0;

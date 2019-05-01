@@ -64,6 +64,7 @@ void TClient::Talking(){
     std::thread twrite(thread_write, m_client_sock);
 
     tread.join();
+    // std::terminate();
     twrite.join();
 
     close(m_client_sock);

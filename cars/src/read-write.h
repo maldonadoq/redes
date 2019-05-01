@@ -6,6 +6,7 @@
 #include <string>
 #include <thread>
 #include <chrono>
+#include "utils.h"
 
 void print_road(std::string _road, unsigned r, unsigned c){
 	unsigned i,j;
@@ -24,22 +25,37 @@ void thread_write(int _sockFD){
 
 	while(true){
 		getline(std::cin, text);
+		if(text == "end"){
+			break;
+		}
 		send(_sockFD, text.c_str(), text.size(), 0);
 	}
 }
 
-void thread_read(int _sockFD, unsigned row, unsigned col){
-	unsigned buffer_size = row;
+void thread_read(int _sockFD, unsigned _rsize, unsigned _csize){
+	unsigned buffer_size = _rsize*_csize;
 	char buffer[buffer_size];
+
+	int n;
 
 	while(true){
 		memset(&buffer, 0, buffer_size);
-		if(recv(_sockFD, buffer, buffer_size, 0) > 0){
-			// std::cout << buffer << "\n";
+		n = recv(_sockFD, buffer, buffer_size, 0);
+		if(n == 0){
 			system("clear");
-			print_road(buffer, row, col);
+			std::cout << "you are lose --- write end to finished\n";
+			break;
+		}
+		else if(n < 0){
+			perror("error receiving text");
+		}
+		else{
+			system("clear");
+			print_table_from_str(std::string(buffer),_rsize,_csize);
 		}
 	}
+
+
 }
 
 #endif
