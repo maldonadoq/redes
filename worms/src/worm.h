@@ -17,6 +17,7 @@ public:
 	void Move(char, unsigned, unsigned);
 	bool IsThere(int, int);
 	void AddQueue(int);
+	int  GetSize();
 };
 
 TWorm::TWorm(){
@@ -114,6 +115,10 @@ void TWorm::AddQueue(int t){
 	for(int i=0; i<t; i++){
 		m_body.push_back(tmp);
 	}
+}
+
+int TWorm::GetSize(){
+	return (int)m_body.size();
 }
 
 TWorm::~TWorm(){
