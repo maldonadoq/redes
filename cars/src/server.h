@@ -124,7 +124,7 @@ void TServer::UpdateTable(int _t){
 		if(m_cars[i].Move(m_speed, rsize)){
 			PrintBody(m_cars[i].m_x, m_cars[i].m_y, m_cars[i].m_avatar);
 		}
-		else{
+		else{			
 			// Disconnet(i);
 			// i--;
 		}
@@ -208,6 +208,7 @@ void TServer::HandleClient(TSocket *cli, TCar *car){
 	TServer::m_cmutex.lock();
 
 		cli->SetId(TServer::m_clients.size());
+		cli->m_state = true;
 	
 		bool avatar = true;
 		while(avatar){
@@ -245,7 +246,7 @@ void TServer::HandleClient(TSocket *cli, TCar *car){
 	
 	int idx;
 	bool t = true;
-	while(t){
+	while(cli->m_state){
 		memset(buffer, 0, sizeof(buffer));
 		n = recv(cli->m_sock, buffer, sizeof(buffer), 0);
 
@@ -254,31 +255,26 @@ void TServer::HandleClient(TSocket *cli, TCar *car){
 			Disconnet(idx);
 			break;
 		}
-		else if(n < 0){
-			perror("error receiving text");
-		}
-		else{
+		else if(n > 0){
 			idx = TServer::FindClientIdx(cli);
 			t = m_cars[idx].Move(buffer[0], csize);
 			// m_speed = GetMaxSpeed();
 
-			// here
-			if(!t){				
-				// idx = TServer::FindClientIdx(cli);
+			if(!t){
 				Disconnet(idx);
 			}
 		}
 	}
 }
 
-void TServer::Disconnet(int idx){
-	std::string text = "";
-
-	send(m_clients[idx].m_sock, text.c_str(), text.size(), 0);
-	std::cout << m_clients[idx].m_name << " disconneted\n";
-	close(m_clients[idx].m_sock);
-
+void TServer::Disconnet(int idx){	
 	TServer::m_cmutex.lock();
+		m_clients[idx].m_state = false;
+		std::string text = "";
+		send(m_clients[idx].m_sock, text.c_str(), text.size(), 0);
+		std::cout << m_clients[idx].m_name << " disconneted\n";
+		close(m_clients[idx].m_sock);
+	
 		TServer::m_clients.erase(TServer::m_clients.begin()+idx);
 		TServer::m_cars.erase(TServer::m_cars.begin()+idx);
 	TServer::m_cmutex.unlock();

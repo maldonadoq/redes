@@ -6,10 +6,14 @@
 class TSocket{
 public:
 	std::string m_name;
+	bool m_state;
 	int m_id;
 	int m_sock;
 
-	TSocket(){	};
+	TSocket(){
+		this->m_state = true;
+	}
+
 	~TSocket(){	};
 
 	void SetName(std::string);
