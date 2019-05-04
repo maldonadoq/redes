@@ -19,6 +19,9 @@
 extern unsigned rsize;
 extern unsigned csize;
 
+std::string sroada = "";
+std::string sroadb = "";
+
 class TServer{
 private:
 	static std::mutex m_cmutex;
@@ -35,7 +38,11 @@ private:
 	static bool IsAvatarUsed(char);
 	static void UpdateTable(int);
 	static void ClearTable(std::string);	
-	static void PrintBody(int);
+	static void PrintBody(int, int, char);
+	static void Disconnet(int);
+	static int GetMaxSpeed();
+
+	static int  m_speed;
 public:
 	TServer();
 	~TServer();
@@ -51,11 +58,18 @@ public:
 std::vector<TSocket>	TServer::m_clients;
 std::vector<TCar>		TServer::m_cars;
 int 					TServer::m_server_sock;
+int 					TServer::m_speed;
 std::mutex 				TServer::m_cmutex;
 char** 					TServer::m_table;
 
 TServer::TServer(){
 	m_server_sock = socket(AF_INET, SOCK_STREAM, 0);
+
+	this->m_speed = 0;
+	for(unsigned i=0; i<rsize; i+=2){
+		sroada += "| ";
+		sroadb += " |";
+	}
 }
 
 void TServer::CreateTable(){
@@ -75,7 +89,7 @@ void TServer::CreateTable(){
 void TServer::ClearTable(std::string _line){
 	unsigned i, j;
 
-	for(i=1; i<rsize-1; i++){
+	for(i=0; i<rsize; i++){
 		for(j=1; j<csize-1; j++){
 			m_table[i][j] = ' ';
 		}
@@ -87,26 +101,32 @@ void TServer::ClearTable(std::string _line){
 	}
 }
 
-void TServer::PrintBody(int _idx){
-	m_table[m_cars[_idx].m_x][m_cars[_idx].m_y] = m_cars[_idx].m_avatar;
-	m_table[m_cars[_idx].m_x+1][m_cars[_idx].m_y] = m_cars[_idx].m_avatar;
-	m_table[m_cars[_idx].m_x+1][m_cars[_idx].m_y-1] = m_cars[_idx].m_avatar;
-	m_table[m_cars[_idx].m_x+1][m_cars[_idx].m_y+1] = m_cars[_idx].m_avatar;
+void TServer::PrintBody(int _x, int _y, char _av){
+	m_table[_x][_y]   = _av;
+	m_table[_x][_y-1] = _av;
+	m_table[_x][_y+1] = _av;
 
-	m_table[m_cars[_idx].m_x-1][m_cars[_idx].m_y] = m_cars[_idx].m_avatar;
-	m_table[m_cars[_idx].m_x-1][m_cars[_idx].m_y-1] = m_cars[_idx].m_avatar;
-	m_table[m_cars[_idx].m_x-1][m_cars[_idx].m_y+1] = m_cars[_idx].m_avatar;
+	m_table[_x+1][_y]   = _av;
+	m_table[_x+1][_y-1] = _av;
+	m_table[_x+1][_y+1] = _av;
+
+	m_table[_x-1][_y]   = _av;
+	m_table[_x-1][_y-1] = _av;
+	m_table[_x-1][_y+1] = _av;
 }
 
 
 void TServer::UpdateTable(int _t){
-	unsigned i, j;
+	int i;
 
 	ClearTable(GetLine(_t));
-
-	for(i=0; i<m_cars.size(); i++){
-		if(m_cars[i].Brake(rsize)){
-			PrintBody(i);
+	for(i=0; i<(int)m_cars.size(); i++){
+		if(m_cars[i].Move(m_speed, rsize)){
+			PrintBody(m_cars[i].m_x, m_cars[i].m_y, m_cars[i].m_avatar);
+		}
+		else{
+			// Disconnet(i);
+			// i--;
 		}
 	}
 }
@@ -131,25 +151,26 @@ void TServer::Connect(int _port){
 }
 
 std::string TServer::GetLine(int init){
-	std::string _tab = "";
-	std::string _t;
+	if(init == 0)
+		return sroada;
 
-	switch(init){
-		case 0:
-			_t = "| ";
-			break;
-		case 1:
-			_t = " |";
-			break;
-		default:
-			break;
+	return sroadb;
+}
+
+int TServer::GetMaxSpeed(){
+	if(m_clients.size() > 0){
+		int i = 0;
+		int tmax = m_cars[i].GetSpeed();
+
+		for(i = 1; i<(int)m_cars.size(); i++){
+			if(m_cars[i].GetSpeed() > tmax){
+				tmax = m_cars[i].GetSpeed();
+			}
+		}
+
+		return tmax;
 	}
-
-	for(unsigned i=0; i<rsize; i+=2){
-		_tab += _t;
-	}
-
-	return _tab;
+	return 0;
 }
 
 void TServer::Listening(){
@@ -179,7 +200,7 @@ void TServer::Listening(){
 
 void TServer::HandleClient(TSocket *cli, TCar *car){
 
-	char buffer[256];
+	char buffer[1];
 	std::string text = "";
 
 	int n;
@@ -196,6 +217,7 @@ void TServer::HandleClient(TSocket *cli, TCar *car){
 			if(n > 0){
 				if(!TServer::IsAvatarUsed(buffer[0])){
 					car->SetAvatar(buffer[0]);
+					car->SetSpeed(m_speed);
 					avatar = false;
 
 					text = "1";
@@ -209,11 +231,11 @@ void TServer::HandleClient(TSocket *cli, TCar *car){
 		}
 
 		srand(time(NULL));
-		unsigned tr = 1;
-		unsigned tc = 2+(rand()%(csize-3));
+		unsigned tr = rsize/2;
+		unsigned tc = 2+(rand()%(csize-4));
 
 		car->SetPosition(tr, tc);
-		// std::cout << "[" << tr << "," << tc << "]\n";
+
 		std::cout << "client: " << cli->m_name << " connected\tid: " << cli->m_id << "\n";
 
 		TServer::m_clients.push_back(*cli);
@@ -228,14 +250,8 @@ void TServer::HandleClient(TSocket *cli, TCar *car){
 		n = recv(cli->m_sock, buffer, sizeof(buffer), 0);
 
 		if(n == 0){
-			std::cout << cli->m_name << " disconneted\n";
-			close(cli->m_sock);
-
-			TServer::m_cmutex.lock();
-				idx = TServer::FindClientIdx(cli);
-				TServer::m_clients.erase(TServer::m_clients.begin()+idx);
-				TServer::m_cars.erase(TServer::m_cars.begin()+idx);
-			TServer::m_cmutex.unlock();
+			idx = TServer::FindClientIdx(cli);
+			Disconnet(idx);
 			break;
 		}
 		else if(n < 0){
@@ -243,24 +259,29 @@ void TServer::HandleClient(TSocket *cli, TCar *car){
 		}
 		else{
 			idx = TServer::FindClientIdx(cli);
-			t = m_cars[idx].Move(buffer[0], rsize, csize);
+			t = m_cars[idx].Move(buffer[0], csize);
+			// m_speed = GetMaxSpeed();
 
 			// here
-			if(!t){
-				text = "";
-
-				send(cli->m_sock, text.c_str(), text.size(), 0);
-				std::cout << cli->m_name << " disconneted\n";
-					close(cli->m_sock);
-
-				TServer::m_cmutex.lock();
-					idx = TServer::FindClientIdx(cli);
-					TServer::m_clients.erase(TServer::m_clients.begin()+idx);
-					TServer::m_cars.erase(TServer::m_cars.begin()+idx);
-				TServer::m_cmutex.unlock();
+			if(!t){				
+				// idx = TServer::FindClientIdx(cli);
+				Disconnet(idx);
 			}
 		}
 	}
+}
+
+void TServer::Disconnet(int idx){
+	std::string text = "";
+
+	send(m_clients[idx].m_sock, text.c_str(), text.size(), 0);
+	std::cout << m_clients[idx].m_name << " disconneted\n";
+	close(m_clients[idx].m_sock);
+
+	TServer::m_cmutex.lock();
+		TServer::m_clients.erase(TServer::m_clients.begin()+idx);
+		TServer::m_cars.erase(TServer::m_cars.begin()+idx);
+	TServer::m_cmutex.unlock();
 }
 
 void TServer::Send(){
@@ -274,7 +295,7 @@ void TServer::Send(){
 		UpdateTable(initial%2);
 		text = table_to_str(m_table, rsize, csize);
 		SendToAllClients(text);
-		initial++;
+		initial++;  // posible error
 	}
 }
 
