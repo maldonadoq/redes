@@ -130,6 +130,8 @@ std::string get_direction(std::string _recv){
     return routes[p404];
 }
 
+// build: g++ server.cpp -o server.out  
+// run:   sudo ./server.out
 int main(int argc, char const *argv[]){
     struct sockaddr_in stSockAddr;                              // Address Socket
     int SocketFD = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);   // File Descriptor
