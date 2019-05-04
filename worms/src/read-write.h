@@ -15,9 +15,9 @@ void thread_write(int _sockFD){
 	std::string text;
 
 	while(true){
-		getline(std::cin, text);
+		// getline(std::cin, text);
 		// send(_sockFD, text.c_str(), text.size(), 0);
-		DIR = text[0];
+		DIR = getch();
 	}
 }
 
@@ -36,10 +36,15 @@ void thread_write_speed(int _sockFD, int _speed){
 void thread_read(int _sockFD, unsigned _rsize, unsigned _csize){
 	unsigned buffer_size = _rsize*_csize;
 	char buffer[buffer_size];
+	int n;
 
 	while(true){
 		memset(&buffer, 0, buffer_size);
-		if(recv(_sockFD, buffer, buffer_size, 0) > 0){
+		n = recv(_sockFD, buffer, buffer_size, 0);
+		if(n == 0){
+			break;
+		}
+		else if(n > 0){
 			system("clear");			
 			print_table_from_str(std::string(buffer),_rsize,_csize);
 		}
