@@ -8,24 +8,13 @@
 #include <chrono>
 #include "utils.h"
 
-void print_road(std::string _road, unsigned r, unsigned c){
-	unsigned i,j;
-
-	std::string tmp = "";
-	for(j=0; j<(c-3)/2; j++)
-		tmp += " ";
-
-	for(i=0; i<r; i++){
-		std::cout << "|" << tmp << _road[i] << tmp << "|\n";
-	}
-}
-
 void thread_write(int _sockFD){
 	std::string text;
-
+	char tmp = 27;
 	while(true){
-		getline(std::cin, text);
-		if(text == "end"){
+		// getline(std::cin, text);
+		text = getch();
+		if(text[0] == tmp){
 			break;
 		}
 		send(_sockFD, text.c_str(), text.size(), 0);
@@ -41,21 +30,25 @@ void thread_read(int _sockFD, unsigned _rsize, unsigned _csize){
 	while(true){
 		memset(&buffer, 0, buffer_size);
 		n = recv(_sockFD, buffer, buffer_size, 0);
-		if(n == 0){
-			system("clear");
-			std::cout << "you are lose --- write end to finished\n";
+		system("clear");
+		if(n == 0){			
+			// std::cout << "You are lose\t[Write \"end\" to finished]\n";
 			break;
-		}
+		}		
 		else if(n < 0){
 			perror("error receiving text");
 		}
 		else{
-			system("clear");
-			print_table_from_str(std::string(buffer),_rsize,_csize);
-		}
+			if(n == 1){
+				if(buffer[0] = '0')
+					std::cout << "This avatar is already used!\n";
+				else
+					std::cout << "Avatar accepted!\n";
+			}
+			else
+				print_table_from_str(std::string(buffer),_rsize,_csize);
+		}		
 	}
-
-
 }
 
 #endif
