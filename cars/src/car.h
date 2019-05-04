@@ -2,7 +2,7 @@
 #define _CAR_H_
 
 class TCar{	
-	float m_speed;	
+	int m_speed;	
 public:
 	int  m_x;
 	int  m_y;
@@ -12,7 +12,7 @@ public:
 		this->m_avatar = ' ';
 	}
 
-	void SetSpeed(float _speed){
+	void SetSpeed(int _speed){
 		this->m_speed = _speed;		
 	}
 
@@ -25,36 +25,43 @@ public:
 		this->m_avatar = _av;
 	}
 
-	bool Brake(int _rsize){
-		if(m_x < _rsize-3){
-			m_x += 1;
-			return true;
-		}
-		return false;
-	}
-
-	bool Move(char _move, unsigned _r, unsigned _c){
+	bool Move(char _move, unsigned _c){
 		switch(_move){
+			case 'o':
+			case 'O':{				
+				m_speed++;				
+				break;
+			}
+			case 'l':
+			case 'L':{				
+				m_speed--;
+				break;
+			}
 			case 'w':
-			case 'W':{				
-				m_x -= 3;
-				if(m_x < 0){
-					m_x = 0;
+			case 'W':{
+				m_x -= 1;
+				if(m_x < 1)
 					return false;
-				}
+				break;
+			}
+			case 's':
+			case 'S':{
+				m_x += 1;
+				if(m_x >= (_c-1))
+					return false;
 				break;
 			}
 			case 'a':
 			case 'A':{
 				m_y -= 1;
 				if(m_y < 2)
-					return false;				
+					return false;
 				break;
 			}
 			case 'd':
 			case 'D':{
 				m_y += 1;
-				if(m_y > (_c-3))
+				if(m_y >= (_c-2))
 					return false;
 				break;
 			}
@@ -63,6 +70,19 @@ public:
 		}
 
 		return true;
+	}
+
+	bool Move(int road_speed, unsigned _r){
+		m_x += (road_speed - m_speed);
+
+		if((m_x > 0) and (m_x < (_r - 1)))
+			return true;
+
+		return false;
+	}
+
+	int GetSpeed(){
+		return this->m_speed;
 	}
 
 	~TCar(){	};
