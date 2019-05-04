@@ -14,6 +14,8 @@
 #include "thread.h"
 #include "utils.h"
 
+#define nfruits 10
+
 class TServer{
 private:
 	static std::vector<TData> m_clients;	
@@ -34,6 +36,7 @@ private:
 	static void UpdateTable(int);
 	static void ClearTable();	
 	static int  IsFruit(int, int);
+	static bool m_playing;
 public:
 	TServer();
 	~TServer();
@@ -41,7 +44,7 @@ public:
 	void Connect(int);
 	void Listening();
 	void CreateTable(unsigned, unsigned);
-	void GenerateFruit(unsigned);
+	static void GenerateFruit(unsigned);
 	static void * HandleClient(void *);
 };
 
@@ -49,6 +52,7 @@ std::vector<TData> TServer::m_clients;
 std::vector<TWorm> TServer::m_worms;
 std::vector<std::pair<int, int> > TServer::m_fruits;
 char** TServer::m_table;
+bool TServer::m_playing;
 
 unsigned TServer::m_rsize;
 unsigned TServer::m_csize;
@@ -73,7 +77,7 @@ void TServer::CreateTable(unsigned _r, unsigned _c){
 		}
 	}
 
-	GenerateFruit(25);
+	GenerateFruit(nfruits);
 }
 
 void TServer::ClearTable(){
@@ -250,10 +254,12 @@ void *TServer::HandleClient(void *_args){
 
 		std::cout << cli->m_name << " connected\tid: " << cli->m_id << "\tavatar: " << cli->m_avatar << "\n";
 		TServer::m_clients.push_back(*cli);
-		TServer::m_worms.push_back(*wor);		
+		TServer::m_worms.push_back(*wor);
+
+		TServer::m_playing = true;
 	TThread::UnlockMutex(cli->m_name);	
 	
-	while(true){
+	while(m_playing){
 		memset(buffer, 0, sizeof(buffer));
 		n = recv(cli->m_sock, buffer, sizeof(buffer), 0);
 
@@ -275,6 +281,7 @@ void *TServer::HandleClient(void *_args){
 			idx = TServer::FindClientIdx(cli);
 			m_worms[idx].Move(buffer[0], m_rsize, m_csize);
 			TServer::UpdateTable(idx);
+
 			text = table_to_str(m_table, m_rsize, m_csize);
 			TServer::SendToAll(text);
 		}
@@ -286,8 +293,42 @@ void *TServer::HandleClient(void *_args){
 void TServer::SendToAll(std::string text){
 	TThread::LockMutex("'Send'");
 		// std::cout << "\ntext sending: " << text << "\n";
-		for(unsigned i=0; i<m_clients.size(); i++)
-			send(TServer::m_clients[i].m_sock, text.c_str(), text.size(), 0);
+
+		if(m_fruits.size() == 0 and m_playing){
+			m_playing = false;
+			text = "";
+			unsigned i;
+			for(i=0; i<m_clients.size(); i++){
+				send(TServer::m_clients[i].m_sock, text.c_str(), text.size(), 0);
+				close(TServer::m_clients[i].m_sock);
+			}
+			
+			int tid = 0;
+			int tmax = TServer::m_worms[tid].GetSize();
+			int temp_max;			
+
+			for(i=1; i<TServer::m_worms.size(); i++){
+				temp_max = TServer::m_worms[i].GetSize();
+				if(temp_max > tmax){
+					tmax = temp_max;
+					tid = i;
+				}
+			}
+
+			std::cout << "\nThe Winner" << 
+				"\nName: " << TServer::m_clients[tid].m_name << 
+				"\nAvatar " << TServer::m_clients[tid].m_avatar << 
+				"\nFruits: " << TServer::m_worms[tid].GetSize() <<"\n\n";
+
+			TServer::m_clients.clear();
+			TServer::m_worms.clear();
+
+			GenerateFruit(nfruits);
+		}
+		else{
+			for(unsigned i=0; i<m_clients.size(); i++)
+				send(TServer::m_clients[i].m_sock, text.c_str(), text.size(), 0);
+		}
 	TThread::UnlockMutex("'Send'");
 }
 
