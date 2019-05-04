@@ -87,6 +87,8 @@ void TClient::Talking(int _speed){
     std::thread twrites(thread_write_speed, m_clientSock, _speed);
 
     tread.join();
+    // std::cout << "holaa\n";
+    // twrite.kill();
     twrite.join();
     twrites.join();
 
