@@ -14,7 +14,7 @@
 #include "thread.h"
 #include "utils.h"
 
-#define nfruits 10
+#define nfruits 30
 
 class TServer{
 private:
@@ -221,43 +221,40 @@ void *TServer::HandleClient(void *_args){
 
 	int idx, n;
 
-	TThread::LockMutex(cli->m_name);
+	cli->SetId(TServer::m_clients.size());
+	cli->SetName("[client "+std::to_string(cli->m_id)+"]");
 
-		cli->SetId(TServer::m_clients.size());
-		cli->SetName("[client "+std::to_string(cli->m_id)+"]");
+	bool avatar = true;
+	while(avatar){
+		memset(buffer, 0, sizeof(buffer));
+		n = recv(cli->m_sock, buffer, sizeof(buffer), 0);
+		
+		if(n > 0){
+			if(!TServer::IsAvatarUsed(buffer[0])){
+				cli->SetAvatar(buffer[0]);					
+				avatar = false;
 
-		bool avatar = true;
-		while(avatar){
-			memset(buffer, 0, sizeof(buffer));
-			n = recv(cli->m_sock, buffer, sizeof(buffer), 0);
-			
-			if(n > 0){
-				if(!TServer::IsAvatarUsed(buffer[0])){
-					cli->SetAvatar(buffer[0]);					
-					avatar = false;
-
-					text = "1";
-					send(cli->m_sock, text.c_str(), text.size(), 0);
-				}
-				else{
-					text = "0";
-					send(cli->m_sock, text.c_str(), text.size(), 0);
-				}
+				text = "1";
+				send(cli->m_sock, text.c_str(), text.size(), 0);
+			}
+			else{
+				text = "0";
+				send(cli->m_sock, text.c_str(), text.size(), 0);
 			}
 		}
+	}
 
-		srand(time(NULL));
-		unsigned tr = 1+(rand()%(m_rsize-2));
-		unsigned tc = 1+(rand()%(m_csize-2));
+	srand(time(NULL));
+	unsigned tr = 1+(rand()%(m_rsize-2));
+	unsigned tc = 1+(rand()%(m_csize-2));
 
-		wor->SetHead(tr, tc);
+	wor->SetHead(tr, tc);
 
-		std::cout << cli->m_name << " connected\tid: " << cli->m_id << "\tavatar: " << cli->m_avatar << "\n";
-		TServer::m_clients.push_back(*cli);
-		TServer::m_worms.push_back(*wor);
+	std::cout << cli->m_name << " connected\tid: " << cli->m_id << "\tavatar: " << cli->m_avatar << "\n";
+	TServer::m_clients.push_back(*cli);
+	TServer::m_worms.push_back(*wor);
 
-		TServer::m_playing = true;
-	TThread::UnlockMutex(cli->m_name);	
+	TServer::m_playing = true;
 	
 	while(m_playing){
 		memset(buffer, 0, sizeof(buffer));

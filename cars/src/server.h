@@ -204,45 +204,40 @@ void TServer::HandleClient(TSocket *cli, TCar *car){
 	std::string text = "";
 
 	int n;
+	cli->SetId(TServer::m_clients.size());
+	cli->m_state = true;
 
-	TServer::m_cmutex.lock();
+	bool avatar = true;
+	while(avatar){
+		memset(buffer, 0, sizeof(buffer));
+		n = recv(cli->m_sock, buffer, sizeof(buffer), 0);
+		
+		if(n > 0){
+			if(!TServer::IsAvatarUsed(buffer[0])){
+				car->SetAvatar(buffer[0]);
+				car->SetSpeed(m_speed);
+				avatar = false;
 
-		cli->SetId(TServer::m_clients.size());
-		cli->m_state = true;
-	
-		bool avatar = true;
-		while(avatar){
-			memset(buffer, 0, sizeof(buffer));
-			n = recv(cli->m_sock, buffer, sizeof(buffer), 0);
-			
-			if(n > 0){
-				if(!TServer::IsAvatarUsed(buffer[0])){
-					car->SetAvatar(buffer[0]);
-					car->SetSpeed(m_speed);
-					avatar = false;
-
-					text = "1";
-					send(cli->m_sock, text.c_str(), text.size(), 0);
-				}
-				else{
-					text = "0";
-					send(cli->m_sock, text.c_str(), text.size(), 0);
-				}
+				text = "1";
+				send(cli->m_sock, text.c_str(), text.size(), 0);
+			}
+			else{
+				text = "0";
+				send(cli->m_sock, text.c_str(), text.size(), 0);
 			}
 		}
+	}
 
-		srand(time(NULL));
-		unsigned tr = rsize/2;
-		unsigned tc = 2+(rand()%(csize-4));
+	srand(time(NULL));
+	unsigned tr = rsize/2;
+	unsigned tc = 2+(rand()%(csize-4));
 
-		car->SetPosition(tr, tc);
+	car->SetPosition(tr, tc);
 
-		std::cout << "client: " << cli->m_name << " connected\tid: " << cli->m_id << "\n";
+	std::cout << "client: " << cli->m_name << " connected\tid: " << cli->m_id << "\n";
 
-		TServer::m_clients.push_back(*cli);
-		TServer::m_cars.push_back(*car);
-
-	TServer::m_cmutex.unlock();
+	TServer::m_clients.push_back(*cli);
+	TServer::m_cars.push_back(*car);
 	
 	int idx;
 	bool t = true;
