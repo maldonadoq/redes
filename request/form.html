@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Maldonado</title>
+</head>
+<body style="background: #E6E6E6;">
+    <h1 style="text-align:center;">Form Page</h1>
+    <hr>
+
+    <form method="get">
+        Name: <input type="text" name="N" value="Percy"> <br>
+        Last Name: <input type="text" name="L" value="Maldonado"> <br>
+        <input type="submit">
+    </form>
+</body>
+</html>
+
+<!--
+1)
+	POST /form HTTP/1.1
+	Content-Type: application/x-www-form-urlencoded
+	Content-Length: 32
+
+	N=Percy&L=Maldonado
+	
+	Post Method is in the Body
+2)
+	run: nc ucsp.edu.pe 80
+	and write: GET
+	press enter!
+
+	nc ucsp.edu.pe 80
+	GET
+
+	HTTP/1.1 400 Bad Request
+	Server: nginx  <---- Server
+	Date: Sat, 11 May 2019 13:34:47 GMT
+	Content-Type: text/html
+	Content-Length: 166
+	Connection: close
+
+	<html>
+	<head><title>400 Bad Request</title></head>
+	<body bgcolor="white">
+	<center><h1>400 Bad Request</h1></center>
+	<hr><center>nginx</center>
+	</body>
+	</html>
+
+
+	Server of Webpages of ucsp
+
+3)
+	traceroute 185.164.57.189	- France
+	traceroute 186.27.32.34		- Bolivia
+
+	France is more closer than Bolivia
+-->
