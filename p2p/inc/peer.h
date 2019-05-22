@@ -1,24 +1,32 @@
 #ifndef _PEER_H_
 #define _PEER_H_
 
+#include <boost/algorithm/string.hpp> 
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <string.h>
 #include <thread>
+#include <future>
 
 #include "protocol.h"
+#include "peer-info.h"
 
 class TPeer{
 private:
+    static std::vector<TPeerInfo> m_peers;
+
     static int m_bits_size;
     static int m_peer_sock;
     struct sockaddr_in m_peer_addr;
 
     static void KeepAlive(int);
     static void Read();
-    static void GetPeerList();
+    static void PeerLeft(TPeerInfo);
+    static void PeerJoin(TPeerInfo);
+
+    void GetPeerList();
 public:
     TPeer(int);
     TPeer();
@@ -31,6 +39,7 @@ public:
 
 int TPeer::m_peer_sock;
 int TPeer::m_bits_size;
+std::vector<TPeerInfo> TPeer::m_peers;
 
 TPeer::TPeer(int _bits_size){
     this->m_peer_sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -70,57 +79,66 @@ void TPeer::LogIn(std::string _ip, int _port){
     }
 
     std::cout << "Client Connected\n";
+    GetPeerList();
 }
 
 void TPeer::KeepAlive(int _sleep){
     std::string text;
     TProtocol mtcp(m_bits_size);
-
-    std::vector<std::string> tmp = {"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Temporibus dignissimos inc.", "Hello maldonado, how are you?!!", "Esto es una prueba del protocolo desarrollado"};
-
-    srand(time(NULL));
     while(true){        
         text = "on";
-        mtcp.Sending(text, m_peer_sock);
+        mtcp.Sending(text, m_peer_sock, "K");
         std::this_thread::sleep_for(std::chrono::milliseconds(_sleep));
     }
 }
 
-void TPeer::Read(){
-    unsigned buffer_size = 1;
-    char buffer[buffer_size];
+void TPeer::GetPeerList(){
+    std::string rtext;
+    std::string rlist;
+    TProtocol mtcp(m_bits_size);
+    rtext = "List";
 
-    int n;
+    std::thread tsend_request(mtcp.Sending, rtext, m_peer_sock, "L");
+    auto future = std::async(mtcp.Receiving, m_peer_sock);
 
-    while(true){
-        memset(&buffer, 0, buffer_size);
-        n = recv(m_peer_sock, buffer, buffer_size, 0);
-        if(n == 0){         
-            break;
+    tsend_request.join();
+    rlist = future.get();
+
+    if(rlist.size() > 0){
+        std::vector<std::string> result;
+        boost::split(result, rlist, boost::is_any_of("|")); 
+
+        TPeerInfo pinfo;
+        for(unsigned i=0; i<result.size(); i++){
+            pinfo = {result[i], 0};
+            m_peers.push_back(pinfo);
+
+            std::cout << result[i] << " ";
         }
-        else if(n < 0){
-            perror("error receiving text");
-        }
-        else{
-            std::cout << buffer << "\n";
-        }       
-    }
+        std::cout << "\n";
+    }    
 }
 
-void TPeer::GetPeerList(){
-    
+void TPeer::PeerJoin(TPeerInfo _peer){
+    m_peers.push_back(_peer);
+}
+
+void TPeer::PeerLeft(TPeerInfo _peer){
+    std::vector<TPeerInfo> peers_tmp;
+    for(unsigned i=0; i<m_peers.size(); i++){
+        if(m_peers[i].m_ip == _peer.m_ip){
+            peers_tmp.push_back(m_peers[i]);
+        }
+    }
+
+    m_peers = peers_tmp;
 }
 
 void TPeer::Run(){
     int tsleep = 2500;
     std::thread talive(KeepAlive, tsleep);  // Keep Alive
-    std::thread tread(Read);                // Read Message
-    std::thread tgetlist(GetPeerList);      // Get Peer List
 
     talive.join();
-    tread.join();
-    tgetlist.join();
-
     close(m_peer_sock);
 }
 
