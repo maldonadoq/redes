@@ -5,9 +5,8 @@
 
 class TSocket{
 public:
-	std::string m_name;
+	std::string m_ip;
 	bool m_state;
-	int m_id;
 	int m_sock;
 
 	TSocket(){
@@ -16,16 +15,11 @@ public:
 
 	~TSocket(){	};
 
-	void SetName(std::string);
-	void SetId(int);
+	void SetIp(std::string);
 };
 
-void TSocket::SetName(std::string _name){
-	this->m_name = _name;
-}
-
-void TSocket::SetId(int _id){
-	this->m_id = _id;
+void TSocket::SetIp(std::string _ip){
+	this->m_ip = _ip;
 }
 
 #endif
