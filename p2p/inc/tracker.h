@@ -28,6 +28,7 @@ private:
 	static void SendToAllClients(std::string);
 	static int  FindClientIdx(TSocket *);	
 	static void Disconnet(int);
+	static std::string GetPeerList();
 public:
 	TTracker();
 	TTracker(int);
@@ -77,6 +78,8 @@ void TTracker::Listening(){
 	socklen_t cli_size = sizeof(sockaddr_in);
 	struct sockaddr_in m_clientAddr;
 
+	int ip_unique = 0;
+
 	while(true){
 		cli = new TSocket();
 		thr = new TThread();
@@ -87,10 +90,30 @@ void TTracker::Listening(){
 	    if(cli->m_sock < 0)
 	        perror("Error on accept");
 	    else{	    	
-	    	cli->SetName(inet_ntoa(m_clientAddr.sin_addr));
+	    	// cli->SetName(inet_ntoa(m_clientAddr.sin_addr));
+	    	cli->SetIp(std::to_string(ip_unique));
+	    	ip_unique++;
 	        thr->Create(TTracker::HandleClient, cli);
 	    }
 	}
+}
+
+std::string TTracker::GetPeerList(){
+	std::string speers = "";
+	unsigned tsize = m_peers.size();
+
+	if(tsize == 1){
+		speers = m_peers[0].m_ip;
+	}
+	else if(tsize >= 1){
+		for(unsigned i=0; i<tsize-1; i++){
+			speers += m_peers[i].m_ip + "|";
+		}
+
+		speers += m_peers[tsize-1].m_ip;
+	}
+
+	return speers;
 }
 
 void TTracker::HandleClient(TSocket *cli){
@@ -98,17 +121,37 @@ void TTracker::HandleClient(TSocket *cli){
 	std::string text = "";
 
 	int n;
-	cli->SetId(TTracker::m_peers.size());
 	cli->m_state = true;
 
-	std::cout << "client: " << cli->m_name << " Created\tid: " << cli->m_id << "\n";
+	std::cout << "ip client: " << cli->m_ip << " Created\n";
 
 	TTracker::m_peers.push_back(*cli);
 	
 	int idx;
 	TProtocol mtcp(m_bits_size);
+	std::string command, list_peer;
 	while(cli->m_state){
-		std::cout << mtcp.Receiving(cli->m_sock) << "\n";
+		command = mtcp.Receiving(cli->m_sock);
+		// std::cout << command << "\n";
+		if(command.size() > 1){
+			switch(command[0]){
+				case 'K':
+				case 'k':{
+					std::cout << "Keep Alive\n";
+					break;
+				}
+				case 'L':
+				case 'l':{
+					list_peer = GetPeerList();
+					// std::cout << list_peer << "\n";
+					mtcp.Sending(list_peer, cli->m_sock, "");
+					std::cout << "Get List\n";
+					break;
+				}
+				default:
+					break;
+			}
+		}
 	}
 }
 
@@ -117,7 +160,7 @@ void TTracker::Disconnet(int idx){
 		m_peers[idx].m_state = false;
 		std::string text = "";
 		send(m_peers[idx].m_sock, text.c_str(), text.size(), 0);
-		std::cout << m_peers[idx].m_name << " disconneted\n";
+		std::cout << m_peers[idx].m_ip << " disconneted\n";
 		close(m_peers[idx].m_sock);
 	
 		TTracker::m_peers.erase(TTracker::m_peers.begin()+idx);
@@ -134,7 +177,7 @@ void TTracker::SendToAllClients(std::string _text){
 
 int TTracker::FindClientIdx(TSocket *_cli){
 	for(unsigned i=0; i<m_peers.size(); i++)
-		if(TTracker::m_peers[i].m_id == _cli->m_id)
+		if(TTracker::m_peers[i].m_ip == _cli->m_ip)
 			return i;
 
 	return 0;
