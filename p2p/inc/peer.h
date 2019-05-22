@@ -22,7 +22,6 @@ private:
     struct sockaddr_in m_peer_addr;
 
     static void KeepAlive(int);
-    static void Read();
     static void PeerLeft(TPeerInfo);
     static void PeerJoin(TPeerInfo);
 

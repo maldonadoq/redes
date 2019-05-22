@@ -25,8 +25,8 @@ private:
 	struct sockaddr_in m_tracker_addr;
 	static int m_tracker_sock;
 
-	static void SendToAllClients(std::string);
-	static int  FindClientIdx(TSocket *);	
+	static void SendToAllPeers(std::string);
+	static int  FindPeerIdx(TSocket *);	
 	static void Disconnet(int);
 	static std::string GetPeerList();
 public:
@@ -36,7 +36,7 @@ public:
 
 	void Create(int);
 	void Listening();
-	static void HandleClient(TSocket *);
+	static void HandlePeer(TSocket *);
 };
 
 std::vector<TSocket>	TTracker::m_peers;
@@ -93,7 +93,7 @@ void TTracker::Listening(){
 	    	// cli->SetName(inet_ntoa(m_clientAddr.sin_addr));
 	    	cli->SetIp(std::to_string(ip_unique));
 	    	ip_unique++;
-	        thr->Create(TTracker::HandleClient, cli);
+	        thr->Create(TTracker::HandlePeer, cli);
 	    }
 	}
 }
@@ -116,7 +116,7 @@ std::string TTracker::GetPeerList(){
 	return speers;
 }
 
-void TTracker::HandleClient(TSocket *cli){
+void TTracker::HandlePeer(TSocket *cli){
 	char buffer[m_bits_size];
 	std::string text = "";
 
@@ -167,7 +167,7 @@ void TTracker::Disconnet(int idx){
 	TTracker::m_cmutex.unlock();
 }
 
-void TTracker::SendToAllClients(std::string _text){
+void TTracker::SendToAllPeers(std::string _text){
 	TTracker::m_cmutex.lock();
 		for(unsigned i=0; i<m_peers.size(); i++){			
 			send(TTracker::m_peers[i].m_sock, _text.c_str(), _text.size(), 0);
@@ -175,7 +175,7 @@ void TTracker::SendToAllClients(std::string _text){
 	TTracker::m_cmutex.unlock();
 }
 
-int TTracker::FindClientIdx(TSocket *_cli){
+int TTracker::FindPeerIdx(TSocket *_cli){
 	for(unsigned i=0; i<m_peers.size(); i++)
 		if(TTracker::m_peers[i].m_ip == _cli->m_ip)
 			return i;
