@@ -10,6 +10,7 @@
 #include "utils.h"
 
 /*
+	1 -> commando				--|
 	1 -> bool [body or head]	--|
 	3 -> size of message		--|	size = 4
 */
