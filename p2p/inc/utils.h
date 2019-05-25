@@ -2,6 +2,10 @@
 #define _UTILS_H_
 
 #include <vector>
+#include <termios.h>
+#include <stdio.h>
+
+static struct termios told, tnew;
 
 void print_vector(std::vector<std::string> _vec){
 	for(unsigned i=0; i<_vec.size(); i++){
@@ -18,6 +22,26 @@ std::string add_zeros_left(int _number, unsigned _size){
 	return tmp;
 }
 
+void initTermios() {
+	tcgetattr(0, &told);
+	tnew = told;
+	tnew.c_lflag &= ~ICANON;
+	tnew.c_lflag &= ~ECHO;
+	tcsetattr(0, TCSANOW, &tnew);
+}
 
+void resetTermios() {
+	tcsetattr(0, TCSANOW, &told);
+}
+
+char getch(){
+	char ch;
+	initTermios();
+
+	ch = getchar();
+
+	resetTermios();
+	return ch;
+}
 
 #endif
