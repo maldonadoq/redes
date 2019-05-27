@@ -11,50 +11,64 @@
 #include <thread>
 #include <mutex>
 
-#include "socket-info.h"
-#include "thread-u.h"
+#include "peer-info.h"
 #include "protocol.h"
+
+using std::cout;
+using std::vector;
+using std::string;
+using std::thread;
+using std::mutex;
 
 class TTracker{
 private:
 	static int m_bits_size;
+	static vector<TPeerInfo> m_peers;
 
-	static std::mutex m_cmutex;
-	static std::vector<TSocket> m_peers;
+	static mutex m_cmutex;
 
 	struct sockaddr_in m_tracker_addr;
 	static int m_tracker_sock;
 
-	static void SendToAllPeers(std::string, std::string);
-	static int  FindPeerIdx(TSocket *);	
-	static void Disconnet(int);
-	static std::string GetPeerList();
+	// Server
+	static bool SPeerJoin(TPeerInfo);
+	static bool SPeerLeft(TPeerInfo);
+	static void SListening();
+
+	// Client
+	static void CConnectAndSend(TPeerInfo, string, string);
+	static void CSendMessage(TPeerInfo, string, string);
+	static void CSendToAll(TPeerInfo, string, string);
+
+	static int  PeerFind(TPeerInfo);
+	static string GetPeerList();
 public:
 	TTracker();
-	TTracker(int);
+	TTracker(int, int);
 	~TTracker();
 
 	void Create(int);
-	void Listening();
-	static void HandlePeer(TSocket *);
+	void Execute();
 };
 
-std::vector<TSocket>	TTracker::m_peers;
-int 					TTracker::m_tracker_sock;
-int 					TTracker::m_bits_size;
-std::mutex 				TTracker::m_cmutex;
+vector<TPeerInfo> 	TTracker::m_peers;
+int 				TTracker::m_tracker_sock;
+int 				TTracker::m_bits_size;
+mutex 				TTracker::m_cmutex;
 
 TTracker::TTracker(){
 	m_tracker_sock = socket(AF_INET, SOCK_STREAM, 0);
 }
 
-TTracker::TTracker(int _bits_size){
+TTracker::TTracker(int _bits_size, int _port){
 	m_tracker_sock = socket(AF_INET, SOCK_STREAM, 0);
 	m_bits_size = _bits_size;
+
+	Create(_port);
 }
 
 void TTracker::Create(int _port){
-	int reuse = 1;	
+	int reuse = 1;
     memset(&m_tracker_addr, 0, sizeof(sockaddr_in));
 
     m_tracker_addr.sin_family = AF_INET;
@@ -67,143 +81,199 @@ void TTracker::Create(int _port){
     if(bind(m_tracker_sock, (struct sockaddr *) &m_tracker_addr, sizeof(sockaddr_in)) < 0)
         perror("Failed to bind");
 
-    listen(m_tracker_sock, 5);
-    std::cout << "Server Created!\n";
+    listen(m_tracker_sock, 10);
+    cout << "Server Created!\n";
 }
 
-void TTracker::Listening(){
-	TSocket	*cli;
-	TThread	*thr;
-
+void TTracker::SListening(){
 	socklen_t cli_size = sizeof(sockaddr_in);
-	struct sockaddr_in m_clientAddr;
+	struct sockaddr_in peer_addr;
+	int ConnectSock;
+	bool state = true;
+	string command, message;
+	vector<string> vparse;
 
-	int ip_unique = 0;
+	TProtocol mtcp(m_bits_size);
+	TPeerInfo tinfo;
 
-	while(true){
-		cli = new TSocket();
-		thr = new TThread();
+	while(state){
+		ConnectSock = accept(m_tracker_sock, (struct sockaddr *) &peer_addr, &cli_size);
 
-		// block
-		cli->m_sock = accept(m_tracker_sock, (struct sockaddr *) &m_clientAddr, &cli_size);
-
-	    if(cli->m_sock < 0)
+	    if(ConnectSock < 0)
 	        perror("Error on accept");
 	    else{	    	
-	    	// cli->SetName(inet_ntoa(m_clientAddr.sin_addr));
+	    	// printf("address: %s\n", inet_ntoa(peer_addr.sin_addr));
+	    	// printf("port %d\n", ntohs(peer_addr.sin_port));
+	    	command = mtcp.Receiving(ConnectSock);
+	    	cout << command << "\n";
+	    	switch(command[0]){
+	    		// Peer Client
+	    		case 'G':
+	    		case 'g':{
+	    			cout << "Get Peer List\n";
+	    			vparse = SplitMessage(command.substr(1), "|");
+	    			tinfo = MakePeerInfo(vparse);
+	    			message = GetPeerList();
+	    			CSendMessage(tinfo, message, "G");
+	    			break;
+	    		}
+	    		case 'L':
+	    		case 'l':{
+	    			vparse = SplitMessage(command.substr(1), "|");
+	    			tinfo = MakePeerInfo(vparse);
+	    			if(SPeerJoin(tinfo)){
+	    				// Send to All that one Peer Join
+		    			CSendToAll(tinfo, command.substr(1),"J");
+	    			}		    			
+	    			break;
+	    		}
+	    		case 'O':
+	    		case 'o':{
+	    			vparse = SplitMessage(command.substr(1), "|");
+	    			tinfo = MakePeerInfo(vparse);
+	    			if(SPeerLeft(tinfo)){
+	    				// Send to All that one Peer Join
+		    			CSendToAll(tinfo, command.substr(1),"L");
+	    			}
 
-	    	// std::cout << m_clientAddr.
-	    	printf("address: %s\n", inet_ntoa(m_clientAddr.sin_addr));
-	    	printf("port %d\n", ntohs(m_clientAddr.sin_port));
+	    			// Send to All that one Peer Left
 
-	    	cli->SetIp(std::to_string(ip_unique));
-	    	ip_unique++;
-	        thr->Create(TTracker::HandlePeer, cli);
+	    			break;
+	    		}	    		
+	    		default:
+	    			break;
+	    	}
 	    }
+
+	    shutdown(ConnectSock, SHUT_RDWR);
+		close(ConnectSock);
+	}
+
+	shutdown(m_tracker_sock, SHUT_RDWR);
+	close(m_tracker_sock);
+}
+
+int TTracker::PeerFind(TPeerInfo _pinfo){
+	for(unsigned i=0; i<m_peers.size(); i++){
+		if(m_peers[i].m_port == _pinfo.m_port){
+			return i;
+		}
+	}
+
+	return -1;
+}
+
+bool TTracker::SPeerJoin(TPeerInfo _pinfo){
+	if((_pinfo.m_port > 0) and (PeerFind(_pinfo) < 0)){
+		m_peers.push_back(_pinfo);
+		cout << "Peer Joined\n";
+		return true;
+	}
+	
+	cout << "Peer Already Exist\n";
+	return false;
+}
+
+bool TTracker::SPeerLeft(TPeerInfo _pinfo){
+	int idx = PeerFind(_pinfo);
+	if(idx >= 0){
+		m_peers.erase(m_peers.begin() + idx);
+		cout << "Peer Remove\n";
+		return true;
+	}
+	cout << "Peer Does Not Exist\n";
+	return false;
+}
+
+void TTracker::CSendMessage(TPeerInfo _pinfo, string _message, string _type){
+	if((_pinfo.m_port > 0) and (PeerFind(_pinfo) >= 0)){
+		CConnectAndSend(_pinfo, _message, _type);
+	}
+	else{
+		cout << "Peer Does Not Exist\n";
 	}
 }
 
-std::string TTracker::GetPeerList(){
-	std::string speers = "";
+string TTracker::GetPeerList(){
+	string speers = "";
 	unsigned tsize = m_peers.size();
 
 	if(tsize == 1){
-		speers = m_peers[0].m_ip;
+		speers = PeerToStr(m_peers[0]);
 	}
-	else if(tsize >= 1){
+	else if(tsize > 1){
 		for(unsigned i=0; i<tsize-1; i++){
-			speers += m_peers[i].m_ip + "|";
+			speers += PeerToStr(m_peers[i]) + "|";
 		}
 
-		speers += m_peers[tsize-1].m_ip;
+		speers += PeerToStr(m_peers[tsize-1]);
 	}
 
 	return speers;
 }
 
-void TTracker::HandlePeer(TSocket *cli){
-	char buffer[m_bits_size];
-	std::string text = "";
+void TTracker::CConnectAndSend(TPeerInfo _machine,
+    string _message, string _type){
 
-	int n;
-	cli->m_state = true;
+    int peer_clt_sock = socket(AF_INET, SOCK_STREAM, 0);
+    if(peer_clt_sock < 0){
+        perror("Can not SCreate Socket!");
+        exit(0);
+    }
 
-	std::cout << "ip client: " << cli->m_ip << " Created\n";
+    struct sockaddr_in peer_clt_addr;
 
-	SendToAllPeers(cli->m_ip, "J");
+    memset(&peer_clt_addr, 0, sizeof(peer_clt_addr));
+    peer_clt_addr.sin_family = AF_INET;
+    peer_clt_addr.sin_port = htons(_machine.m_port);
+ 
+    int nr = inet_pton(AF_INET, _machine.m_ip.c_str(), &peer_clt_addr.sin_addr);
+ 
+    if(nr <= 0){
+        perror("error: Not a valid address family");
+        close(peer_clt_sock);
+        exit(0);
+    }
+    /*
+                                   >
+                                   |
+    Connection Established ---------
 
-	TTracker::m_peers.push_back(*cli);
-	std::string command, list_peer;
+    Sending Message ----------------
+                                   |
+                                   <
+    */
 
-	// Init
-	TProtocol mtcp(m_bits_size);
-	command = mtcp.Receiving(cli->m_sock);
+    nr = -1;
+    do{
+        nr = connect(peer_clt_sock, (const struct sockaddr *)&peer_clt_addr, sizeof(struct sockaddr_in));
+        if(nr >= 0){
+            TProtocol mtcp(m_bits_size);
+            mtcp.Sending(_message, peer_clt_sock, _type);
+        }
+    }while(nr < 0);
 
-	if(command[0] == 'L' or command[0] == 'l'){
-		list_peer = GetPeerList();
-		mtcp.Sending(list_peer, cli->m_sock, "");
-	}
-	else{
-		mtcp.Sending("", cli->m_sock, "");
-	}	
-	
-	int idx;	
-	while(cli->m_state){
-		command = mtcp.Receiving(cli->m_sock);
-		// std::cout << command << "\n";
-		if(command.size() > 1){
-			switch(command[0]){
-				case 'K':
-				case 'k':{
-					// std::cout << "Keep Alive\n";
-					break;
-				}
-				case 'O':
-				case 'o':{
-					std::cout << cli->m_ip << " Log Out\n";
-					idx = FindPeerIdx(cli);
-					cli->m_state = false;
-					mtcp.Sending("LogOut", cli->m_sock, "O");
-					Disconnet(idx);
-					break;
-				}
-				default:
-					break;
+    shutdown(peer_clt_sock, SHUT_RDWR);
+    close(peer_clt_sock);
+}
+
+void TTracker::Execute(){
+	thread tlisten(SListening);
+	tlisten.join();
+
+	close(m_tracker_sock);
+}
+
+void TTracker::CSendToAll(TPeerInfo _pinfo, string _text, string _type){
+	TTracker::m_cmutex.lock();
+		
+		for(unsigned i=0; i<m_peers.size(); i++){
+			if(m_peers[i].m_port != _pinfo.m_port){
+				CConnectAndSend(m_peers[i], _text, _type);
 			}
 		}
-	}
-
-	SendToAllPeers(cli->m_ip, "R");
-	delete cli;
-}
-
-void TTracker::Disconnet(int idx){	
-	TTracker::m_cmutex.lock();
-
-		close(m_peers[idx].m_sock);
-		TTracker::m_peers.erase(TTracker::m_peers.begin()+idx);
 
 	TTracker::m_cmutex.unlock();
-}
-
-void TTracker::SendToAllPeers(std::string _text, std::string _type){
-	TTracker::m_cmutex.lock();
-
-		TProtocol mtcp(m_bits_size);
-		for(unsigned i=0; i<m_peers.size(); i++){
-			mtcp.Sending(_text, TTracker::m_peers[i].m_sock, _type);
-		}
-
-		// std::cout << "send to all\n";
-	TTracker::m_cmutex.unlock();
-}
-
-int TTracker::FindPeerIdx(TSocket *_cli){
-	for(unsigned i=0; i<m_peers.size(); i++)
-		if(TTracker::m_peers[i].m_ip == _cli->m_ip)
-			return i;
-
-	return -1;
 }
 
 TTracker::~TTracker(){
