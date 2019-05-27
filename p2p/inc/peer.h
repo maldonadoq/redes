@@ -9,6 +9,7 @@
 #include <string.h>
 #include <thread>
 #include <mutex>
+#include <map>
 #include <unistd.h>
 
 #include "protocol.h"
@@ -17,6 +18,7 @@
 
 using std::cout;
 using std::vector;
+using std::map;
 using std::string;
 using std::to_string;
 using std::thread;
@@ -30,17 +32,21 @@ using std::thread;
 
 std::mutex  gmutex;
 
+const string files_name[6] = {"file/file0.txt", "file/file1.txt", "file/file2.txt",
+                              "file/file3.txt", "file/file4.txt", "file/file5.txt"};
 class TPeer{
 private:
+    static map<string, vector<string> > m_chunk_files;
+    static int m_chunk_size;
     static bool m_state;
 
-    static vector<TPeerInfo> m_peers;       // list of neightbor peer
-    static TPeerInfo m_tracker_info;        // tracker ip - port
-    static TPeerInfo m_peer_info;           // peer ip - port
+    static vector<TPeerInfo> m_neighboring_peers;   // list of neightbor peer
+    static TPeerInfo m_tracker_info;                // tracker ip - port
+    static TPeerInfo m_peer_info;                   // peer ip - port
 
-    static int m_bits_size;                 // block of messages
-    static int m_peer_server_sock;          // server sock
-    struct sockaddr_in m_peer_server_addr;  // server address
+    static int m_bits_size;                         // block of messages
+    static int m_peer_server_sock;                  // server sock
+    struct sockaddr_in m_peer_server_addr;          // server address
     
     // Server
     static void SPeerLeft(TPeerInfo);
@@ -51,6 +57,7 @@ private:
     // Client
     static void CConnectAndSend(TPeerInfo, string, string);
     static void CTesting();
+    static void CUpload(string, string);
 
     void Init();
     static void PrintPeers();
@@ -66,13 +73,16 @@ TPeerInfo   TPeer::m_peer_info;
 TPeerInfo   TPeer::m_tracker_info;
 int         TPeer::m_peer_server_sock;
 int         TPeer::m_bits_size;
+int         TPeer::m_chunk_size;
 bool        TPeer::m_state;
 
-vector<TPeerInfo> TPeer::m_peers;
+map<string, vector<string> >    TPeer::m_chunk_files;
+vector<TPeerInfo>               TPeer::m_neighboring_peers;
 
 TPeer::TPeer(string _tracker_ip, int _tracker_port, int _bits_size){
     m_state         = true;
     m_bits_size     = _bits_size;
+    m_chunk_size    = 32;
 
     // Client    
     m_tracker_info  = {_tracker_ip, _tracker_port};    
@@ -154,8 +164,8 @@ void TPeer::CConnectAndSend(TPeerInfo _machine,
 
 void TPeer::CTesting(){
     char cmmd;
-    string message;
-
+    string message, tfile;
+    int nfile;
     while(m_state){
         cmmd = getch();
         switch(cmmd){
@@ -182,7 +192,33 @@ void TPeer::CTesting(){
                 break;
             }
             default:
+                if(cmmd >= '0' and cmmd <= '5'){
+                    nfile = cmmd - '0';
+                    tfile = ReadFile(files_name[nfile]);
+                    CUpload(files_name[nfile], tfile);
+                }
                 break;
+        }
+    }
+}
+
+void TPeer::CUpload(string _file_key ,string _file_body){
+    vector<string> nchunk = SplitText(_file_body, m_chunk_size);
+
+    // print_vector(nchunk);
+    cout << nchunk.size() << "\n";
+
+    if(m_neighboring_peers.size() != 0){
+
+    }
+    else{
+        std::map<string, vector<string> >::iterator it;
+        it = m_chunk_files.find(_file_body);
+        if(m_chunk_files.find(_file_key) != m_chunk_files.end()){
+
+        }
+        else{
+
         }
     }
 }
@@ -278,7 +314,7 @@ void TPeer::SPeerListJoin(vector<string> _parse){
 
 void TPeer::SPeerJoin(TPeerInfo _peer){
     if(_peer.m_port > 0){
-        m_peers.push_back(_peer);
+        m_neighboring_peers.push_back(_peer);
     }
     else{
         cout << "Peer Port Must be Greater than 0!\n";
@@ -288,13 +324,13 @@ void TPeer::SPeerJoin(TPeerInfo _peer){
 void TPeer::SPeerLeft(TPeerInfo _peer){
     if(_peer.m_port > 0){
         vector<TPeerInfo> peers_tmp;
-        for(unsigned i=0; i<m_peers.size(); i++){
-            if(m_peers[i].m_port != _peer.m_port){
-                peers_tmp.push_back(m_peers[i]);
+        for(unsigned i=0; i<m_neighboring_peers.size(); i++){
+            if(m_neighboring_peers[i].m_port != _peer.m_port){
+                peers_tmp.push_back(m_neighboring_peers[i]);
             }
         }
 
-        m_peers = peers_tmp;
+        m_neighboring_peers = peers_tmp;
     }
     else{
         cout << "Peer Port Must be Greater than 0!\n";
@@ -303,8 +339,8 @@ void TPeer::SPeerLeft(TPeerInfo _peer){
 
 void TPeer::PrintPeers(){
     cout << "Peers's List [ip - port]\n";
-    for(unsigned i=0; i<m_peers.size(); i++){
-        cout << m_peers[i].m_ip << " - " << m_peers[i].m_port << "\n";
+    for(unsigned i=0; i<m_neighboring_peers.size(); i++){
+        cout << m_neighboring_peers[i].m_ip << " - " << m_neighboring_peers[i].m_port << "\n";
     }
 }
 
