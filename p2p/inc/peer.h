@@ -8,213 +8,298 @@
 #include <unistd.h>
 #include <string.h>
 #include <thread>
-#include <future>
+#include <mutex>
+#include <unistd.h>
 
 #include "protocol.h"
 #include "peer-info.h"
 #include "utils.h"
 
+using std::cout;
+using std::vector;
+using std::string;
+using std::to_string;
+using std::thread;
+
+/*
+    Client Testing Commands [Press Key!!]:
+        L/l -> Login
+        O/o -> Logout
+        G/g -> Get Peer List
+*/
+
+std::mutex  gmutex;
+
 class TPeer{
 private:
-    static std::vector<TPeerInfo> m_peers;
+    static bool m_state;
 
-    static int m_bits_size;
-    static int m_peer_sock;
-    struct sockaddr_in m_peer_addr;
+    static vector<TPeerInfo> m_peers;       // list of neightbor peer
+    static TPeerInfo m_tracker_info;        // tracker ip - port
+    static TPeerInfo m_peer_info;           // peer ip - port
 
-    static void KeepAlive(int);
-    static void PeerLeft(TPeerInfo);
-    static void PeerJoin(TPeerInfo);
-    static void Testing();
-    static void Listening();
+    static int m_bits_size;                 // block of messages
+    static int m_peer_server_sock;          // server sock
+    struct sockaddr_in m_peer_server_addr;  // server address
+    
+    // Server
+    static void SPeerLeft(TPeerInfo);
+    static void SPeerJoin(TPeerInfo);
+    static void SPeerListJoin(vector<string>);    
+    static void SListening();
+
+    // Client
+    static void CConnectAndSend(TPeerInfo, string, string);
+    static void CTesting();
+
+    void Init();
     static void PrintPeers();
-
-    void GetPeerList();
 public:
-    TPeer(int);
+    TPeer(string, int, int);
     TPeer();
     ~TPeer();
 
-    void LogIn(std::string, int);   // init connection
-                                    // register on the tracker
-    void Run();                     // keep alive 
+    void Execute();
 };
 
-int TPeer::m_peer_sock;
-int TPeer::m_bits_size;
-std::vector<TPeerInfo> TPeer::m_peers;
+TPeerInfo   TPeer::m_peer_info;
+TPeerInfo   TPeer::m_tracker_info;
+int         TPeer::m_peer_server_sock;
+int         TPeer::m_bits_size;
+bool        TPeer::m_state;
 
-TPeer::TPeer(int _bits_size){
-    this->m_peer_sock = socket(AF_INET, SOCK_STREAM, 0);
-    m_bits_size = _bits_size;
+vector<TPeerInfo> TPeer::m_peers;
+
+TPeer::TPeer(string _tracker_ip, int _tracker_port, int _bits_size){
+    m_state         = true;
+    m_bits_size     = _bits_size;
+
+    // Client    
+    m_tracker_info  = {_tracker_ip, _tracker_port};    
+
+    // Server
+    m_peer_info     = {getIPAddress(), getpid()};
+    this->m_peer_server_sock = socket(AF_INET, SOCK_STREAM, 0);
+    Init();
 }
 
 TPeer::TPeer(){
 
 }
 
-void TPeer::LogIn(std::string _ip, int _port){
-    if(m_peer_sock < 0){
+void TPeer::Init(){
+    int reuse = 1;
+    memset(&m_peer_server_addr, 0, sizeof(sockaddr_in));
+
+    m_peer_server_addr.sin_family = AF_INET;
+    m_peer_server_addr.sin_addr.s_addr = INADDR_ANY;
+    m_peer_server_addr.sin_port = htons(m_peer_info.m_port);
+
+    //Avoid bind error if the socket was not close()
+    setsockopt(m_peer_server_sock, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(int));
+
+    int nr = bind(m_peer_server_sock, (struct sockaddr *) &m_peer_server_addr, sizeof(sockaddr_in));
+    if(nr < 0){
+        perror("Failed to bind");
+    }
+
+    listen(m_peer_server_sock, 10);
+    cout << "Peer-Server Created!\n";
+}
+
+void TPeer::CConnectAndSend(TPeerInfo _machine,
+    string _message, string _type){
+
+    int peer_clt_sock = socket(AF_INET, SOCK_STREAM, 0);
+    if(peer_clt_sock < 0){
         perror("Can not Create Socket!");
         exit(0);
     }
 
-    memset(&m_peer_addr, 0, sizeof(m_peer_addr));
-    m_peer_addr.sin_family = AF_INET;
-    m_peer_addr.sin_port = htons(_port);
- 
-    int res = inet_pton(AF_INET, _ip.c_str(), &m_peer_addr.sin_addr);
- 
-    if (0 > res){
-        perror("error: first parameter is not a valid address family");
-        close(m_peer_sock);
-        exit(EXIT_FAILURE);
-    }
-    else if (0 == res){
-        perror("char string (second parameter does not contain valid ipaddress");
-        close(m_peer_sock);
-        exit(EXIT_FAILURE);
-    }
+    struct sockaddr_in peer_clt_addr;
 
-    if (connect(m_peer_sock, (const struct sockaddr *)&m_peer_addr, sizeof(m_peer_addr)) < 0){
-        perror("connect failed"); 
-        exit(1);
+    memset(&peer_clt_addr, 0, sizeof(peer_clt_addr));
+    peer_clt_addr.sin_family = AF_INET;
+    peer_clt_addr.sin_port = htons(_machine.m_port);
+ 
+    int nr = inet_pton(AF_INET, _machine.m_ip.c_str(), &peer_clt_addr.sin_addr);
+ 
+    if(nr <= 0){
+        perror("error: Not a valid address family");
+        close(peer_clt_sock);
+        exit(0);
     }
+    /*
+                                   >
+                                   |
+    Connection Established ---------
 
-    std::cout << "Client Connected\n";
-    GetPeerList();
+    Sending Message ----------------
+                                   |
+                                   <
+    */
+
+    nr = -1;
+    do{
+        nr = connect(peer_clt_sock, (const struct sockaddr *)&peer_clt_addr, sizeof(struct sockaddr_in));
+        if(nr >= 0){
+            TProtocol mtcp(m_bits_size);
+            mtcp.Sending(_message, peer_clt_sock, _type);
+        }
+    }while(nr < 0);
+
+    shutdown(peer_clt_sock, SHUT_RDWR);
+    close(peer_clt_sock);
 }
 
-void TPeer::KeepAlive(int _sleep){
-    std::string text;
-    TProtocol mtcp(m_bits_size);
-    while(m_peer_sock > 0){
-        text = "on";
-        mtcp.Sending(text, m_peer_sock, "K");
-        std::this_thread::sleep_for(std::chrono::milliseconds(_sleep));
+void TPeer::CTesting(){
+    char cmmd;
+    string message;
+
+    while(m_state){
+        cmmd = getch();
+        switch(cmmd){
+            // Peer Client
+            case 'G':
+            case 'g':{
+                message = PeerToStr(m_peer_info);
+                CConnectAndSend(m_tracker_info,message,"G");
+                break;
+            }
+            case 'L':
+            case 'l':{
+                message = PeerToStr(m_peer_info);
+                CConnectAndSend(m_tracker_info,message,"L");
+                break;
+            }
+            case 'O':
+            case 'o':{
+                message = PeerToStr(m_peer_info);
+                CConnectAndSend(m_tracker_info,message,"O");
+                /*gmutex.lock();
+                    m_state = false;
+                gmutex.unlock();*/
+                break;
+            }
+            default:
+                break;
+        }
     }
+}
+
+void TPeer::Execute(){
+    thread ttest(CTesting);
+    thread tlisten(SListening);
+
+    ttest.join();
+    tlisten.join();
+
+    close(m_peer_server_sock);
+}
+
+void TPeer::SListening(){
+    socklen_t cli_size = sizeof(sockaddr_in);
+    struct sockaddr_in peer_addr;
+    int ConnectSock;
+    string command;
+    vector<string> vparse;
+
+    TProtocol mtcp(m_bits_size);
+    TPeerInfo pinfo;
+
+    while(m_state){
+        ConnectSock = accept(m_peer_server_sock, (struct sockaddr *) &peer_addr, &cli_size);
+        if(ConnectSock < 0)
+            perror("Error on accept");
+        else{           
+            // printf("address: %s\n", inet_ntoa(peer_addr.sin_addr));
+            // printf("port %d\n", ntohs(peer_addr.sin_port));
+            command = mtcp.Receiving(ConnectSock);
+            cout << command << "\n";
+            switch(command[0]){
+                // Peer Server
+                case 'G':
+                case 'g':{
+                    cout << "Set Peer List\n";
+                    vparse = SplitMessage(command.substr(1), "|");
+                    SPeerListJoin(vparse);
+                    break;
+                }
+                case 'J':
+                case 'j':{
+                    cout << "Peer Join\n";
+                    vparse = SplitMessage(command.substr(1), "|");
+                    pinfo = MakePeerInfo(vparse);
+                    SPeerJoin(pinfo);
+                    break;
+                }
+                case 'L':
+                case 'l':{
+                    cout << "Peer Remove\n";
+                    vparse = SplitMessage(command.substr(1), "|");
+                    pinfo = MakePeerInfo(vparse);
+                    SPeerLeft(pinfo);
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+        shutdown(ConnectSock, SHUT_RDWR);
+        close(ConnectSock);
+    }
+
+    shutdown(m_peer_server_sock, SHUT_RDWR);
+    close(m_peer_server_sock);
+}
+
+void TPeer::SPeerListJoin(vector<string> _parse){
+    if((_parse.size() > 2) and ((int)_parse.size()%2 == 0)){
+        TPeerInfo pinfo;
+        for(unsigned i=0; i<_parse.size(); i+=2){
+            pinfo = {_parse[i], stoi(_parse[i+1])};
+            if(pinfo.m_port != m_peer_info.m_port){
+                SPeerJoin(pinfo);
+            }
+        }
+        PrintPeers();
+    }
+    else{
+        cout << "List of Peer Must be Even! [ip,port]\n";
+    }
+}
+
+void TPeer::SPeerJoin(TPeerInfo _peer){
+    if(_peer.m_port > 0){
+        m_peers.push_back(_peer);
+    }
+    else{
+        cout << "Peer Port Must be Greater than 0!\n";
+    }
+}
+
+void TPeer::SPeerLeft(TPeerInfo _peer){
+    if(_peer.m_port > 0){
+        vector<TPeerInfo> peers_tmp;
+        for(unsigned i=0; i<m_peers.size(); i++){
+            if(m_peers[i].m_port != _peer.m_port){
+                peers_tmp.push_back(m_peers[i]);
+            }
+        }
+
+        m_peers = peers_tmp;
+    }
+    else{
+        cout << "Peer Port Must be Greater than 0!\n";
+    } 
 }
 
 void TPeer::PrintPeers(){
-    std::cout << "list of peers ip: ";
+    cout << "Peers's List [ip - port]\n";
     for(unsigned i=0; i<m_peers.size(); i++){
-        std::cout << m_peers[i].m_ip << " ";
-    }
-    std::cout << "\n";
-}
-
-void TPeer::Listening(){
-    TProtocol mtcp(m_bits_size);
-    std::string text;
-    bool tstate = true;
-
-    TPeerInfo pinfo;
-    while(tstate){
-        text = mtcp.Receiving(m_peer_sock);
-        switch(text[0]){
-            case 'O':
-            case 'o':{
-                tstate = false;
-                break;
-            }
-            case 'R':
-            case 'r':{
-                std::cout << "\nremove: " << text.substr(1) << "\n";
-                pinfo = {text.substr(1), 0};
-                PeerLeft(pinfo);
-                PrintPeers();
-                break;
-            }
-            case 'J':
-            case 'j':{
-                std::cout << "\njoin: " << text.substr(1) << "\n";
-                // excluir la misma ip
-                pinfo = {text.substr(1), 0};
-                PeerJoin(pinfo);
-                PrintPeers();
-                break;
-            }
-        }
+        cout << m_peers[i].m_ip << " - " << m_peers[i].m_port << "\n";
     }
 }
-
-void TPeer::Testing(){
-    TProtocol mtcp(m_bits_size);
-    char _type;
-    bool state = true;
-    while(state){
-        _type = getch();
-
-        switch(_type){
-            case 'O':
-            case 'o':{                
-                state = false;
-                mtcp.Sending("LogOut", m_peer_sock, "O");
-                std::cout << "LogOut\n";
-                m_peer_sock = -1;
-                break;
-            }
-        }
-    }
-}
-
-void TPeer::GetPeerList(){
-    std::string rtext;
-    std::string rlist;
-    TProtocol mtcp(m_bits_size);
-    rtext = "List";
-
-    std::thread tsend_request(mtcp.Sending, rtext, m_peer_sock, "L");
-    auto future = std::async(mtcp.Receiving, m_peer_sock);
-
-    tsend_request.join();
-    rlist = future.get();
-
-    if(rlist.size() > 0){
-        std::vector<std::string> result;
-        boost::split(result, rlist, boost::is_any_of("|")); 
-
-        TPeerInfo pinfo;
-        std::cout << "list of peers: ";
-        for(unsigned i=0; i<result.size(); i++){
-            pinfo = {result[i], 0};
-            m_peers.push_back(pinfo);
-
-            std::cout << result[i] << " ";
-        }
-        std::cout << "\n";
-    }    
-}
-
-void TPeer::PeerJoin(TPeerInfo _peer){
-    m_peers.push_back(_peer);
-}
-
-void TPeer::PeerLeft(TPeerInfo _peer){
-    std::vector<TPeerInfo> peers_tmp;
-    for(unsigned i=0; i<m_peers.size(); i++){
-        if(m_peers[i].m_ip != _peer.m_ip){
-            peers_tmp.push_back(m_peers[i]);
-        }
-    }
-
-    m_peers = peers_tmp;
-}
-
-void TPeer::Run(){
-    int tsleep = 2500;
-    std::thread talive(KeepAlive, tsleep);  // Keep Alive
-    std::thread ttest(Testing);             // Testing
-    std::thread tlistenng(Listening);       // Testing
-
-    talive.join();
-    ttest.join();
-    tlistenng.join();
-
-    close(m_peer_sock);
-    m_peers.clear();
-}
-
 
 TPeer::~TPeer(){
 
