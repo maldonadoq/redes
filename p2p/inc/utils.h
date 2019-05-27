@@ -14,6 +14,7 @@
 // split
 #include <boost/algorithm/string.hpp> 
 
+#include <fstream>
 #include "peer-info.h"
 
 using std::cout;
@@ -58,6 +59,35 @@ char getch(){
 
 	resetTermios();
 	return ch;
+}
+
+vector<string> SplitText(string _text, unsigned _size){
+    std::vector<std::string> vsplit;
+    std::string mssg;
+
+    for(unsigned i=0; i<_text.size(); i+=_size){
+        mssg = "";
+        for(unsigned j=0; j<_size and (i + j)<_text.size(); j++){
+            mssg += _text[i+j];
+        }
+        vsplit.push_back(mssg);
+    }
+
+    return vsplit;
+}
+
+static string ReadFile(string filename){
+    std::ifstream ifs(filename, std::ios::binary|std::ios::ate);
+    std::ifstream::pos_type pos = ifs.tellg();
+
+    std::vector<char>  vec_buffer(pos);
+
+    ifs.seekg(0, std::ios::beg);
+    ifs.read(&vec_buffer[0], pos);
+
+    string ret = std::string(vec_buffer.begin(), vec_buffer.end());
+    
+    return ret;
 }
 
 vector<string> SplitMessage(string _message, string _separator){
