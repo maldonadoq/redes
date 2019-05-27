@@ -4,11 +4,9 @@
 // build: g++ tracker.cpp -o tracker.out -pthread
 int main(int argc, char const *argv[]){
 	int port = 7777;
-	int buffer_size = 16;
+	int bs = 16;
 
-	TTracker *t = new TTracker(buffer_size);
-	
-	t->Create(port);
-	t->Listening();
+	TTracker *t = new TTracker(bs, port);
+	t->Execute();
 	return 0;
 }

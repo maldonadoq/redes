@@ -5,12 +5,11 @@
 int main(int argc, char const *argv[]){
 	std::string ip = "127.0.0.1";
 	int port = 7777;
-	int buffer_size = 16;
+	int bs = 16;
 
-	TPeer *cl = new TPeer(buffer_size);
+	TPeer *cl = new TPeer(ip, port, bs);
 
-	cl->LogIn(ip, port);
-	cl->Run();
+	cl->Execute();
 
 	delete cl;
 	return 0;
