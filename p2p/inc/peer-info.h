@@ -10,6 +10,7 @@ struct TPeerInfo
 {
 	std::string m_ip;
 	int m_port;
+	bool m_keep = true;
 };
 
 string PeerToStr(TPeerInfo _peer){
