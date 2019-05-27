@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <thread>
 #include <mutex>
+#include <chrono>
 
 #include "peer-info.h"
 #include "protocol.h"
@@ -34,14 +35,19 @@ private:
 	static bool SPeerJoin(TPeerInfo);
 	static bool SPeerLeft(TPeerInfo);
 	static void SListening();
+	static void SKeepAlive(TPeerInfo);
 
 	// Client
 	static void CConnectAndSend(TPeerInfo, string, string);
 	static void CSendMessage(TPeerInfo, string, string);
 	static void CSendToAll(TPeerInfo, string, string);
+	static void CSendToAll(string, string);
+	static void CTesting(int);
+	static void CKeepAlive();
 
 	static int  PeerFind(TPeerInfo);
-	static string GetPeerList();
+	static void KeepAliveRestart();
+	static string GetPeerList();	
 public:
 	TTracker();
 	TTracker(int, int);
@@ -137,9 +143,17 @@ void TTracker::SListening(){
 	    			}
 
 	    			// Send to All that one Peer Left
-
 	    			break;
-	    		}	    		
+	    		}
+	    		case 'K':
+	    		case 'k':{
+	    			cout << "Keep Peer\n";
+	    			vparse = SplitMessage(command.substr(1), "|");
+	    			tinfo = MakePeerInfo(vparse);
+	    			SKeepAlive(tinfo);
+	    			// cout << PeerToStr(tinfo) << "\n";
+	    			break;
+	    		}
 	    		default:
 	    			break;
 	    	}
@@ -212,6 +226,61 @@ string TTracker::GetPeerList(){
 	return speers;
 }
 
+
+
+void TTracker::CTesting(int _time){
+
+	bool state = true;
+	TProtocol mtcp(m_bits_size);
+	while(state){
+		// cout << "Send Keep Alive\n";
+		CSendToAll("Are you ok?", "K");
+		KeepAliveRestart();
+		std::this_thread::sleep_for(std::chrono::milliseconds(_time));
+		CKeepAlive();
+	}
+}
+
+void TTracker::SKeepAlive(TPeerInfo _pinfo){
+	for(unsigned i=0; i<m_peers.size(); i++){
+		if(m_peers[i].m_port == _pinfo.m_port){
+			m_peers[i].m_keep = true;
+			break;
+		}
+	}
+}
+
+void TTracker::KeepAliveRestart(){
+	for(unsigned i=0; i<m_peers.size(); i++){
+		m_peers[i].m_keep = false;
+	}
+}
+
+void TTracker::CKeepAlive(){
+	TTracker::m_cmutex.lock();
+
+		vector<TPeerInfo> peers_tmp;
+		vector<TPeerInfo> peers_rm;
+
+	    for(unsigned i=0; i<m_peers.size(); i++){
+	        if(m_peers[i].m_keep){
+	            peers_tmp.push_back(m_peers[i]);
+	            cout << PeerToStr(m_peers[i]) << " is Alive\n";
+	        }
+	        else{
+	        	peers_rm.push_back(m_peers[i]);
+	        }
+	    }
+
+	    m_peers = peers_tmp;
+
+	TTracker::m_cmutex.unlock();
+
+	for(unsigned i=0; i<peers_rm.size(); i++){
+		CSendToAll(PeerToStr(peers_rm[i]), "L");
+	}
+}
+
 void TTracker::CConnectAndSend(TPeerInfo _machine,
     string _message, string _type){
 
@@ -258,8 +327,12 @@ void TTracker::CConnectAndSend(TPeerInfo _machine,
 }
 
 void TTracker::Execute(){
+	// int ktime = 10000;
 	thread tlisten(SListening);
+	// thread ttest(CTesting, ktime);
+
 	tlisten.join();
+	// ttest.join();
 
 	close(m_tracker_sock);
 }
@@ -271,6 +344,16 @@ void TTracker::CSendToAll(TPeerInfo _pinfo, string _text, string _type){
 			if(m_peers[i].m_port != _pinfo.m_port){
 				CConnectAndSend(m_peers[i], _text, _type);
 			}
+		}
+
+	TTracker::m_cmutex.unlock();
+}
+
+void TTracker::CSendToAll(string _text, string _type){
+	TTracker::m_cmutex.lock();
+		
+		for(unsigned i=0; i<m_peers.size(); i++){			
+			CConnectAndSend(m_peers[i], _text, _type);
 		}
 
 	TTracker::m_cmutex.unlock();
