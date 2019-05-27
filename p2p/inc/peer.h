@@ -201,7 +201,7 @@ void TPeer::SListening(){
     socklen_t cli_size = sizeof(sockaddr_in);
     struct sockaddr_in peer_addr;
     int ConnectSock;
-    string command;
+    string command, message;
     vector<string> vparse;
 
     TProtocol mtcp(m_bits_size);
@@ -239,6 +239,13 @@ void TPeer::SListening(){
                     vparse = SplitMessage(command.substr(1), "|");
                     pinfo = MakePeerInfo(vparse);
                     SPeerLeft(pinfo);
+                    break;
+                }
+                case 'K':
+                case 'k':{
+                    cout << "I'm Okay!\n";
+                    message = PeerToStr(m_peer_info);
+                    CConnectAndSend(m_tracker_info,message,"K");
                     break;
                 }
                 default:
