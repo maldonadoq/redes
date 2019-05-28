@@ -65,12 +65,14 @@ vector<string> SplitText(string _text, unsigned _size){
     std::vector<std::string> vsplit;
     std::string mssg;
 
+    int k = 0;
     for(unsigned i=0; i<_text.size(); i+=_size){
-        mssg = "";
+        mssg = to_string(k);
         for(unsigned j=0; j<_size and (i + j)<_text.size(); j++){
             mssg += _text[i+j];
         }
         vsplit.push_back(mssg);
+        k++;
     }
 
     return vsplit;
