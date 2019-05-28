@@ -11,6 +11,7 @@
 #include <mutex>
 #include <map>
 #include <unistd.h>
+#include <math.h>
 
 #include "protocol.h"
 #include "peer-info.h"
@@ -32,11 +33,11 @@ using std::thread;
 
 std::mutex  gmutex;
 
-const string files_name[6] = {"file/file0.txt", "file/file1.txt", "file/file2.txt",
-                              "file/file3.txt", "file/file4.txt", "file/file5.txt"};
+const string files_name[6] = {"file/file1.txt", "file/file2.txt", "file/file3.txt", "file/file4.txt"};
 class TPeer{
 private:
     static map<string, vector<string> > m_chunk_files;
+    static vector<string> m_file_complete;
     static int m_chunk_size;
     static bool m_state;
 
@@ -53,14 +54,18 @@ private:
     static void SPeerJoin(TPeerInfo);
     static void SPeerListJoin(vector<string>);    
     static void SListening();
+    static void SUpload(vector<string>);
+    static void SDownload(vector<string>);
 
     // Client
     static void CConnectAndSend(TPeerInfo, string, string);
     static void CTesting();
     static void CUpload(string, string);
+    static void CDownload(string);
 
     void Init();
     static void PrintPeers();
+    static void AddBlock(string, vector<string>);
 public:
     TPeer(string, int, int);
     TPeer();
@@ -78,6 +83,7 @@ bool        TPeer::m_state;
 
 map<string, vector<string> >    TPeer::m_chunk_files;
 vector<TPeerInfo>               TPeer::m_neighboring_peers;
+vector<string>                  TPeer::m_file_complete;
 
 TPeer::TPeer(string _tracker_ip, int _tracker_port, int _bits_size){
     m_state         = true;
@@ -115,6 +121,42 @@ void TPeer::Init(){
 
     listen(m_peer_server_sock, 10);
     cout << "Peer-Server Created!\n";
+}
+
+void TPeer::CDownload(string _file){
+    cout << "Client Download " << _file << "\n";
+
+    for(unsigned i=0; i<m_neighboring_peers.size(); i++){
+        CConnectAndSend(m_neighboring_peers[i],_file+"|"+PeerToStr(m_peer_info), "D");
+    }
+}
+
+void TPeer::SDownload(vector<string> _parse){
+    if(_parse.size() == 3){
+        string _key = _parse[0];
+
+        cout << "\n\nServer Download " << _key << "\n";
+
+        _parse.erase(_parse.begin());
+        TPeerInfo _pinfo = MakePeerInfo(_parse);
+
+        std::map<string, vector<string> >::iterator it;
+        it = m_chunk_files.find(_key);
+
+        string message = "Does not exist!";
+        if(it != m_chunk_files.end()){
+            message = "";
+            for(unsigned i=0; i<(it->second).size(); i++){
+                message += "-" + (it->second)[i];
+            }
+            message = message.substr(1);
+        }
+
+        CConnectAndSend(_pinfo, message, "R");
+    }
+    else{
+        cout << "[key, ip, port]\n";
+    }
 }
 
 void TPeer::CConnectAndSend(TPeerInfo _machine,
@@ -192,13 +234,45 @@ void TPeer::CTesting(){
                 break;
             }
             default:
-                if(cmmd >= '0' and cmmd <= '5'){
-                    nfile = cmmd - '0';
+                if(cmmd >= '1' and cmmd <= '4'){
+                    nfile = cmmd - '0' - 1;
                     tfile = ReadFile(files_name[nfile]);
                     CUpload(files_name[nfile], tfile);
                 }
+                else if(cmmd >= '5' and cmmd <= '8'){
+                    nfile = cmmd - '0' - 5;
+                    CDownload(files_name[nfile]);
+                }
                 break;
         }
+    }
+}
+
+void TPeer::AddBlock(string _key, vector<string> _chunk){
+    std::map<string, vector<string> >::iterator it;
+    it = m_chunk_files.find(_key);
+
+    if(it != m_chunk_files.end()){
+        cout << "finded\n";
+        for(unsigned i=0; i<_chunk.size(); i++){
+            (it->second).push_back(_chunk[i]);
+        }
+
+        cout << "added: " << _chunk.size() << "\n";
+    }
+    else{
+        cout << "init\n";
+        m_chunk_files[_key] = _chunk;
+        cout << "added: " << _chunk.size() << "\n";
+    }
+}
+
+void TPeer::SUpload(vector<string> _parse){
+    if(_parse.size() > 1){
+        string _key = _parse[0];
+        _parse.erase(_parse.begin());
+        cout << "key: " << _key << "\n";
+        AddBlock(_key, _parse);
     }
 }
 
@@ -209,17 +283,34 @@ void TPeer::CUpload(string _file_key ,string _file_body){
     cout << nchunk.size() << "\n";
 
     if(m_neighboring_peers.size() != 0){
+        int nbpp = (int)nchunk.size()/((int)m_neighboring_peers.size()+1);
+        int mbpp = (int)nchunk.size()%((int)m_neighboring_peers.size()+1);
 
+        nbpp += (mbpp == 0)? 0: 1;
+        cout << "each peer receive: " << nbpp << "\n";
+
+        vector<string> tmp;
+        for(unsigned i=0; i<nbpp; i++){
+            tmp.push_back(nchunk[i]);
+        }
+        AddBlock(_file_key, tmp);
+
+        int k = 0;
+        string ablock;
+        for(unsigned i=nbpp; i<nchunk.size(); i+=nbpp){
+            // cout << "send to neightbor " << k << ": ";
+            ablock = _file_key;
+            for(unsigned j=0; j<nbpp and (i+j)<nchunk.size(); j++){
+                // cout << j+i << " ";
+                ablock += "|" + nchunk[i+j];
+            }            
+            // cout << ablock.substr(1) << "\n";
+            CConnectAndSend(m_neighboring_peers[k], ablock, "U");
+            k++;
+        }
     }
     else{
-        std::map<string, vector<string> >::iterator it;
-        it = m_chunk_files.find(_file_body);
-        if(m_chunk_files.find(_file_key) != m_chunk_files.end()){
-
-        }
-        else{
-
-        }
+        AddBlock(_file_key, nchunk);
     }
 }
 
@@ -282,6 +373,25 @@ void TPeer::SListening(){
                     cout << "I'm Okay!\n";
                     message = PeerToStr(m_peer_info);
                     CConnectAndSend(m_tracker_info,message,"K");
+                    break;
+                }
+                case 'U':
+                case 'u':{
+                    cout << "Upload\n";
+                    vparse = SplitMessage(command.substr(1), "|");
+                    SUpload(vparse);
+                    break;
+                }
+                case 'D':
+                case 'd':{
+                    cout << "Download\n";
+                    vparse = SplitMessage(command.substr(1), "|");
+                    SDownload(vparse);
+                    break;
+                }
+                case 'R':
+                case 'r':{
+                    cout << "Receive Download\n";
                     break;
                 }
                 default:
