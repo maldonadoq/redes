@@ -23,6 +23,7 @@ using std::map;
 using std::string;
 using std::to_string;
 using std::thread;
+using std::mutex;
 
 /*
     Client Testing Commands [Press Key!!]:
@@ -33,13 +34,15 @@ using std::thread;
 
 std::mutex  gmutex;
 
-const string files_name[6] = {"file/file1.txt", "file/file2.txt", "file/file3.txt", "file/file4.txt"};
+const string files_name[6] = {"file1.txt", "file2.txt", "file3.txt", "file4.txt"};
 class TPeer{
 private:
     static map<string, vector<string> > m_chunk_files;
     static vector<string> m_file_complete;
     static int m_chunk_size;
+    static int m_file_number;
     static bool m_state;
+    static mutex m_cmutex;
 
     static vector<TPeerInfo> m_neighboring_peers;   // list of neightbor peer
     static TPeerInfo m_tracker_info;                // tracker ip - port
@@ -56,6 +59,7 @@ private:
     static void SListening();
     static void SUpload(vector<string>);
     static void SDownload(vector<string>);
+    static void SDownloadComplete(string);
 
     // Client
     static void CConnectAndSend(TPeerInfo, string, string);
@@ -66,6 +70,7 @@ private:
     void Init();
     static void PrintPeers();
     static void AddBlock(string, vector<string>);
+    static void AddFile(string);
 public:
     TPeer(string, int, int);
     TPeer();
@@ -74,11 +79,13 @@ public:
     void Execute();
 };
 
+mutex       TPeer::m_cmutex;
 TPeerInfo   TPeer::m_peer_info;
 TPeerInfo   TPeer::m_tracker_info;
 int         TPeer::m_peer_server_sock;
 int         TPeer::m_bits_size;
 int         TPeer::m_chunk_size;
+int         TPeer::m_file_number;
 bool        TPeer::m_state;
 
 map<string, vector<string> >    TPeer::m_chunk_files;
@@ -119,13 +126,11 @@ void TPeer::Init(){
         perror("Failed to bind");
     }
 
-    listen(m_peer_server_sock, 10);
+    listen(m_peer_server_sock, 20);
     cout << "Peer-Server Created!\n";
 }
 
 void TPeer::CDownload(string _file){
-    cout << "Client Download " << _file << "\n";
-
     for(unsigned i=0; i<m_neighboring_peers.size(); i++){
         CConnectAndSend(m_neighboring_peers[i],_file+"|"+PeerToStr(m_peer_info), "D");
     }
@@ -134,8 +139,7 @@ void TPeer::CDownload(string _file){
 void TPeer::SDownload(vector<string> _parse){
     if(_parse.size() == 3){
         string _key = _parse[0];
-
-        cout << "\n\nServer Download " << _key << "\n";
+        cout << "\nServer: Download " << _key << "\n";
 
         _parse.erase(_parse.begin());
         TPeerInfo _pinfo = MakePeerInfo(_parse);
@@ -143,20 +147,53 @@ void TPeer::SDownload(vector<string> _parse){
         std::map<string, vector<string> >::iterator it;
         it = m_chunk_files.find(_key);
 
-        string message = "Does not exist!";
+        string message = "Not";
         if(it != m_chunk_files.end()){
             message = "";
             for(unsigned i=0; i<(it->second).size(); i++){
-                message += "-" + (it->second)[i];
+                message += "|" + (it->second)[i];
             }
             message = message.substr(1);
+            cout << "  " << _key << " find: true\n";
+        }
+        else{
+            cout << "  " << _key << " find: false\n";
         }
 
         CConnectAndSend(_pinfo, message, "R");
     }
     else{
-        cout << "[key, ip, port]\n";
+        cout << "  [key, ip, port]\n";
     }
+}
+
+void TPeer::SDownloadComplete(string _key){
+    bool state = true, flag = true;
+
+    std::map<string, vector<string> >::iterator it;
+    it = m_chunk_files.find(_key);
+
+    if(it != m_chunk_files.end()){
+        for(unsigned i=0; i<(it->second).size(); i++){
+            m_file_complete.push_back((it->second)[i]);
+        }
+    }
+
+    while(state){
+        std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+        if(m_file_complete.size() > 0 and flag){
+            vector<string> block = SplitMessage(m_file_complete[0], "-");
+            // cout << block[1] << "\n";
+            m_file_number = stoi(block[1]);
+            flag = false;
+        }
+        else if(m_file_complete.size() == m_file_number){
+            state = false;
+        }
+        cout << "size: " << m_file_complete.size() << "/" << m_file_number << "\n";
+    }
+
+    print_vector(m_file_complete);
 }
 
 void TPeer::CConnectAndSend(TPeerInfo _machine,
@@ -214,18 +251,21 @@ void TPeer::CTesting(){
             // Peer Client
             case 'G':
             case 'g':{
+                cout << "\nClient: Get Peer List\n";
                 message = PeerToStr(m_peer_info);
                 CConnectAndSend(m_tracker_info,message,"G");
                 break;
             }
             case 'L':
             case 'l':{
+                cout << "\nClient: Login\n";
                 message = PeerToStr(m_peer_info);
                 CConnectAndSend(m_tracker_info,message,"L");
                 break;
             }
             case 'O':
             case 'o':{
+                cout << "\nClient: Logout\n";
                 message = PeerToStr(m_peer_info);
                 CConnectAndSend(m_tracker_info,message,"O");
                 /*gmutex.lock();
@@ -236,12 +276,17 @@ void TPeer::CTesting(){
             default:
                 if(cmmd >= '1' and cmmd <= '4'){
                     nfile = cmmd - '0' - 1;
-                    tfile = ReadFile(files_name[nfile]);
+                    cout << "\nClient: Upload " << files_name[nfile] << "\n";
+                    tfile = ReadFile("upload/"+files_name[nfile]);
                     CUpload(files_name[nfile], tfile);
                 }
                 else if(cmmd >= '5' and cmmd <= '8'){
                     nfile = cmmd - '0' - 5;
+                    cout << "\nClient: Download " << files_name[nfile] << "\n";
                     CDownload(files_name[nfile]);
+                    m_file_complete.clear();
+                    thread tdownload_complete(SDownloadComplete, files_name[nfile]);
+                    tdownload_complete.detach();
                 }
                 break;
         }
@@ -253,25 +298,23 @@ void TPeer::AddBlock(string _key, vector<string> _chunk){
     it = m_chunk_files.find(_key);
 
     if(it != m_chunk_files.end()){
-        cout << "finded\n";
+        cout << "    File Exist\n";
         for(unsigned i=0; i<_chunk.size(); i++){
             (it->second).push_back(_chunk[i]);
         }
-
-        cout << "added: " << _chunk.size() << "\n";
     }
     else{
-        cout << "init\n";
+        cout << "    File Created\n";
         m_chunk_files[_key] = _chunk;
-        cout << "added: " << _chunk.size() << "\n";
     }
 }
 
 void TPeer::SUpload(vector<string> _parse){
     if(_parse.size() > 1){
         string _key = _parse[0];
+        cout << "\nServer: Upload " << _key << "\n";
         _parse.erase(_parse.begin());
-        cout << "key: " << _key << "\n";
+        cout << "  key: " << _key << "\n";
         AddBlock(_key, _parse);
     }
 }
@@ -280,7 +323,7 @@ void TPeer::CUpload(string _file_key ,string _file_body){
     vector<string> nchunk = SplitText(_file_body, m_chunk_size);
 
     // print_vector(nchunk);
-    cout << nchunk.size() << "\n";
+    // cout << nchunk.size() << "\n";
 
     if(m_neighboring_peers.size() != 0){
         int nbpp = (int)nchunk.size()/((int)m_neighboring_peers.size()+1);
@@ -298,7 +341,10 @@ void TPeer::CUpload(string _file_key ,string _file_body){
         int k = 0;
         string ablock;
         for(unsigned i=nbpp; i<nchunk.size(); i+=nbpp){
-            // cout << "send to neightbor " << k << ": ";
+            cout << "  Sending to: ";
+            PrintPeer(m_neighboring_peers[k]);
+            cout << "\n";
+
             ablock = _file_key;
             for(unsigned j=0; j<nbpp and (i+j)<nchunk.size(); j++){
                 // cout << j+i << " ";
@@ -342,19 +388,18 @@ void TPeer::SListening(){
             // printf("address: %s\n", inet_ntoa(peer_addr.sin_addr));
             // printf("port %d\n", ntohs(peer_addr.sin_port));
             command = mtcp.Receiving(ConnectSock);
-            cout << command << "\n";
             switch(command[0]){
                 // Peer Server
                 case 'G':
                 case 'g':{
-                    cout << "Set Peer List\n";
+                    cout << "\nServer: Get Peer List\n";
                     vparse = SplitMessage(command.substr(1), "|");
                     SPeerListJoin(vparse);
                     break;
                 }
                 case 'J':
                 case 'j':{
-                    cout << "Peer Join\n";
+                    cout << "\nServer: Peer Join\n";
                     vparse = SplitMessage(command.substr(1), "|");
                     pinfo = MakePeerInfo(vparse);
                     SPeerJoin(pinfo);
@@ -362,7 +407,7 @@ void TPeer::SListening(){
                 }
                 case 'L':
                 case 'l':{
-                    cout << "Peer Remove\n";
+                    cout << "\nServer: Peer Left\n";
                     vparse = SplitMessage(command.substr(1), "|");
                     pinfo = MakePeerInfo(vparse);
                     SPeerLeft(pinfo);
@@ -370,28 +415,27 @@ void TPeer::SListening(){
                 }
                 case 'K':
                 case 'k':{
-                    cout << "I'm Okay!\n";
+                    cout << "\nServer: Keep Alive\n";
                     message = PeerToStr(m_peer_info);
                     CConnectAndSend(m_tracker_info,message,"K");
                     break;
                 }
                 case 'U':
                 case 'u':{
-                    cout << "Upload\n";
                     vparse = SplitMessage(command.substr(1), "|");
                     SUpload(vparse);
                     break;
                 }
                 case 'D':
                 case 'd':{
-                    cout << "Download\n";
                     vparse = SplitMessage(command.substr(1), "|");
                     SDownload(vparse);
                     break;
                 }
                 case 'R':
                 case 'r':{
-                    cout << "Receive Download\n";
+                    cout << "Server: Receive Download\n";
+                    AddFile(command.substr(1));
                     break;
                 }
                 default:
@@ -406,6 +450,19 @@ void TPeer::SListening(){
     close(m_peer_server_sock);
 }
 
+void TPeer::AddFile(string _bfile){
+    if(_bfile != "Not"){
+        cout << "request: " << _bfile << "\n";
+        vector<string> vb = SplitMessage(_bfile,"|");
+
+        m_cmutex.lock();
+            for(unsigned i=0; i<vb.size(); i++){
+                m_file_complete.push_back(vb[i]);
+            }
+        m_cmutex.unlock();
+    }
+}
+
 void TPeer::SPeerListJoin(vector<string> _parse){
     if((_parse.size() > 2) and ((int)_parse.size()%2 == 0)){
         TPeerInfo pinfo;
@@ -418,7 +475,7 @@ void TPeer::SPeerListJoin(vector<string> _parse){
         PrintPeers();
     }
     else{
-        cout << "List of Peer Must be Even! [ip,port]\n";
+        cout << "  N[ip,port]\n";
     }
 }
 
@@ -427,7 +484,7 @@ void TPeer::SPeerJoin(TPeerInfo _peer){
         m_neighboring_peers.push_back(_peer);
     }
     else{
-        cout << "Peer Port Must be Greater than 0!\n";
+        cout << "  Peer port > 0!\n";
     }
 }
 
@@ -443,18 +500,26 @@ void TPeer::SPeerLeft(TPeerInfo _peer){
         m_neighboring_peers = peers_tmp;
     }
     else{
-        cout << "Peer Port Must be Greater than 0!\n";
+        cout << "  Peer Port > 0!\n";
     } 
 }
 
 void TPeer::PrintPeers(){
-    cout << "Peers's List [ip - port]\n";
+    cout << "  Peers's List [ip - port]\n";
     for(unsigned i=0; i<m_neighboring_peers.size(); i++){
-        cout << m_neighboring_peers[i].m_ip << " - " << m_neighboring_peers[i].m_port << "\n";
+        cout << "    ";
+        PrintPeer(m_neighboring_peers[i]);
+        cout << "\n";
     }
 }
 
 TPeer::~TPeer(){
 
 }
+
 #endif
+
+
+/*
+    Warning: File 1 don't Download Completely!!
+*/
