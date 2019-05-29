@@ -87,7 +87,7 @@ void TTracker::Create(int _port){
     if(bind(m_tracker_sock, (struct sockaddr *) &m_tracker_addr, sizeof(sockaddr_in)) < 0)
         perror("Failed to bind");
 
-    listen(m_tracker_sock, 10);
+    listen(m_tracker_sock, 20);
     cout << "Server Created!\n";
 }
 
@@ -111,12 +111,12 @@ void TTracker::SListening(){
 	    	// printf("address: %s\n", inet_ntoa(peer_addr.sin_addr));
 	    	// printf("port %d\n", ntohs(peer_addr.sin_port));
 	    	command = mtcp.Receiving(ConnectSock);
-	    	cout << command << "\n";
+	    	// cout << command << "\n";
 	    	switch(command[0]){
 	    		// Peer Client
 	    		case 'G':
 	    		case 'g':{
-	    			cout << "Get Peer List\n";
+	    			cout << "\nServer: Get Peer List\n";
 	    			vparse = SplitMessage(command.substr(1), "|");
 	    			tinfo = MakePeerInfo(vparse);
 	    			message = GetPeerList();
@@ -125,6 +125,7 @@ void TTracker::SListening(){
 	    		}
 	    		case 'L':
 	    		case 'l':{
+	    			cout << "\nServer: Peer Join\n";
 	    			vparse = SplitMessage(command.substr(1), "|");
 	    			tinfo = MakePeerInfo(vparse);
 	    			if(SPeerJoin(tinfo)){
@@ -135,6 +136,7 @@ void TTracker::SListening(){
 	    		}
 	    		case 'O':
 	    		case 'o':{
+	    			cout << "\nServer: Peer Left\n";
 	    			vparse = SplitMessage(command.substr(1), "|");
 	    			tinfo = MakePeerInfo(vparse);
 	    			if(SPeerLeft(tinfo)){
@@ -147,7 +149,7 @@ void TTracker::SListening(){
 	    		}
 	    		case 'K':
 	    		case 'k':{
-	    			cout << "Keep Peer\n";
+	    			cout << "\nServer: Keep Alive\n";
 	    			vparse = SplitMessage(command.substr(1), "|");
 	    			tinfo = MakePeerInfo(vparse);
 	    			SKeepAlive(tinfo);
@@ -180,11 +182,11 @@ int TTracker::PeerFind(TPeerInfo _pinfo){
 bool TTracker::SPeerJoin(TPeerInfo _pinfo){
 	if((_pinfo.m_port > 0) and (PeerFind(_pinfo) < 0)){
 		m_peers.push_back(_pinfo);
-		cout << "Peer Joined\n";
+		cout << "  Peer Joined\n";
 		return true;
 	}
 	
-	cout << "Peer Already Exist\n";
+	cout << "  Peer Already Exist\n";
 	return false;
 }
 
@@ -192,10 +194,10 @@ bool TTracker::SPeerLeft(TPeerInfo _pinfo){
 	int idx = PeerFind(_pinfo);
 	if(idx >= 0){
 		m_peers.erase(m_peers.begin() + idx);
-		cout << "Peer Remove\n";
+		cout << "  Peer Remove\n";
 		return true;
 	}
-	cout << "Peer Does Not Exist\n";
+	cout << "  Peer Does Not Exist\n";
 	return false;
 }
 
@@ -204,7 +206,7 @@ void TTracker::CSendMessage(TPeerInfo _pinfo, string _message, string _type){
 		CConnectAndSend(_pinfo, _message, _type);
 	}
 	else{
-		cout << "Peer Does Not Exist\n";
+		cout << "  Peer Does Not Exist\n";
 	}
 }
 
