@@ -65,15 +65,22 @@ vector<string> SplitText(string _text, unsigned _size){
     std::vector<std::string> vsplit;
     std::string mssg;
 
+    int c = (int)_text.size()/(int)_size;
+    int r = (int)_text.size()%(int)_size;
+
+    c += (r == 0)? 0: 1;
+
     int k = 0;
     for(unsigned i=0; i<_text.size(); i+=_size){
-        mssg = to_string(k);
+        mssg = to_string(k)+"-"+to_string(c)+"-";
         for(unsigned j=0; j<_size and (i + j)<_text.size(); j++){
             mssg += _text[i+j];
         }
         vsplit.push_back(mssg);
         k++;
     }
+
+
 
     return vsplit;
 }
@@ -90,6 +97,10 @@ static string ReadFile(string filename){
     string ret = std::string(vec_buffer.begin(), vec_buffer.end());
     
     return ret;
+}
+
+void SaveFile(string _text){
+    
 }
 
 vector<string> SplitMessage(string _message, string _separator){
