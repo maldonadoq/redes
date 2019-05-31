@@ -130,6 +130,9 @@ void TTracker::SListening(){
 	    			tinfo = MakePeerInfo(vparse);
 	    			if(SPeerJoin(tinfo)){
 	    				// Send to All that one Peer Join
+	    				message = GetPeerList();
+	    				CSendMessage(tinfo, message, "G");
+	    				
 		    			CSendToAll(tinfo, command.substr(1),"J");
 	    			}		    			
 	    			break;
