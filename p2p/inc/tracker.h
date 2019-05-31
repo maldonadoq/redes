@@ -38,16 +38,16 @@ private:
 	static void SKeepAlive(TPeerInfo);
 
 	// Client
-	static void CConnectAndSend(TPeerInfo, string, string);
+	static void CConnectAndSend(TPeerInfo&, string, string);
 	static void CSendMessage(TPeerInfo, string, string);
 	static void CSendToAll(TPeerInfo, string, string);
 	static void CSendToAll(string, string);
-	static void CTesting(int);
-	static void CKeepAlive();
+	static void CKeepAlive(int);	
 
 	static int  PeerFind(TPeerInfo);
 	static void KeepAliveRestart();
-	static string GetPeerList();	
+	static void KeepAlive();
+	static string GetPeerList();
 public:
 	TTracker();
 	TTracker(int, int);
@@ -152,9 +152,11 @@ void TTracker::SListening(){
 	    		}
 	    		case 'K':
 	    		case 'k':{
-	    			cout << "\nServer: Keep Alive\n";
 	    			vparse = SplitMessage(command.substr(1), "|");
 	    			tinfo = MakePeerInfo(vparse);
+	    			cout << "Server: Keep Alive ->";
+	    			PrintPeer(tinfo);
+	    			cout << "\tOk\n";
 	    			SKeepAlive(tinfo);
 	    			// cout << PeerToStr(tinfo) << "\n";
 	    			break;
@@ -233,16 +235,16 @@ string TTracker::GetPeerList(){
 
 
 
-void TTracker::CTesting(int _time){
+void TTracker::CKeepAlive(int _time){
 
 	bool state = true;
 	TProtocol mtcp(m_bits_size);
 	while(state){
 		// cout << "Send Keep Alive\n";
-		CSendToAll("Are you ok?", "K");
 		KeepAliveRestart();
+		CSendToAll("Are you ok?", "K");
 		std::this_thread::sleep_for(std::chrono::milliseconds(_time));
-		CKeepAlive();
+		KeepAlive();
 	}
 }
 
@@ -259,9 +261,13 @@ void TTracker::KeepAliveRestart(){
 	for(unsigned i=0; i<m_peers.size(); i++){
 		m_peers[i].m_keep = false;
 	}
+
+	if(m_peers.size() > 0){
+		cout << "---------------------------------------------------------\n";
+	}
 }
 
-void TTracker::CKeepAlive(){
+void TTracker::KeepAlive(){
 	TTracker::m_cmutex.lock();
 
 		vector<TPeerInfo> peers_tmp;
@@ -270,9 +276,10 @@ void TTracker::CKeepAlive(){
 	    for(unsigned i=0; i<m_peers.size(); i++){
 	        if(m_peers[i].m_keep){
 	            peers_tmp.push_back(m_peers[i]);
-	            cout << PeerToStr(m_peers[i]) << " is Alive\n";
+	            // cout << PeerToStr(m_peers[i]) << " is Alive\n";
 	        }
 	        else{
+	        	// m_peers[i].m_state = false;
 	        	peers_rm.push_back(m_peers[i]);
 	        }
 	    }
@@ -286,7 +293,7 @@ void TTracker::CKeepAlive(){
 	}
 }
 
-void TTracker::CConnectAndSend(TPeerInfo _machine,
+void TTracker::CConnectAndSend(TPeerInfo &_machine,
     string _message, string _type){
 
     int peer_clt_sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -318,26 +325,30 @@ void TTracker::CConnectAndSend(TPeerInfo _machine,
                                    <
     */
 
-    nr = -1;
-    do{
+    //nr = -1;
+    //do{
         nr = connect(peer_clt_sock, (const struct sockaddr *)&peer_clt_addr, sizeof(struct sockaddr_in));
         if(nr >= 0){
             TProtocol mtcp(m_bits_size);
             mtcp.Sending(_message, peer_clt_sock, _type);
+            // cout << "  Connect: Ok\n";
         }
-    }while(nr < 0);
+        /*else{
+        	cout << "  Connect: Fail\n";
+        }
+    }while((nr < 0) and _machine.m_state);*/
 
     shutdown(peer_clt_sock, SHUT_RDWR);
     close(peer_clt_sock);
 }
 
 void TTracker::Execute(){
-	// int ktime = 10000;
+	int ktime = 2000;
 	thread tlisten(SListening);
-	// thread ttest(CTesting, ktime);
+	thread tkeep(CKeepAlive, ktime);
 
 	tlisten.join();
-	// ttest.join();
+	tkeep.join();
 
 	close(m_tracker_sock);
 }
