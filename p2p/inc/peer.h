@@ -95,7 +95,9 @@ vector<string>                  TPeer::m_file_complete;
 TPeer::TPeer(string _tracker_ip, int _tracker_port, int _bits_size){
     m_state         = true;
     m_bits_size     = _bits_size;
-    m_chunk_size    = 32;
+    m_chunk_size    = 256;
+
+    m_chunk_files.clear();
 
     // Client    
     m_tracker_info  = {_tracker_ip, _tracker_port};    
@@ -139,7 +141,8 @@ void TPeer::CDownload(string _file){
 void TPeer::SDownload(vector<string> _parse){
     if(_parse.size() == 3){
         string _key = _parse[0];
-        cout << "\nServer: Download " << _key << "\n";
+        cout << "\nServer: Download\n";
+        cout << "  key: " << _key << "\n";
 
         _parse.erase(_parse.begin());
         TPeerInfo _pinfo = MakePeerInfo(_parse);
@@ -154,10 +157,10 @@ void TPeer::SDownload(vector<string> _parse){
                 message += "|" + (it->second)[i];
             }
             message = message.substr(1);
-            cout << "  " << _key << " find: true\n";
+            cout << "  find: true\n";
         }
         else{
-            cout << "  " << _key << " find: false\n";
+            cout << "  find: false\n";
         }
 
         CConnectAndSend(_pinfo, message, "R");
@@ -177,20 +180,25 @@ void TPeer::SDownloadComplete(string _key){
         for(unsigned i=0; i<(it->second).size(); i++){
             m_file_complete.push_back((it->second)[i]);
         }
+
+        if(m_file_complete.size() > 0){
+            vector<string> block = SplitMessage(m_file_complete[0], "/");
+            m_file_number = stoi(block[1]);
+        }
     }
 
     while(state){
         std::this_thread::sleep_for(std::chrono::milliseconds(5000));
-        if(m_file_complete.size() > 0 and flag){
-            vector<string> block = SplitMessage(m_file_complete[0], "-");
+        if(m_file_complete.size() == m_file_number){
+            state = false;
+        }
+        else if(m_file_complete.size() > 0 and flag){
+            vector<string> block = SplitMessage(m_file_complete[0], "/");
             // cout << block[1] << "\n";
             m_file_number = stoi(block[1]);
             flag = false;
         }
-        else if(m_file_complete.size() == m_file_number){
-            state = false;
-        }
-        cout << "size: " << m_file_complete.size() << "/" << m_file_number << "\n";
+        cout << "  Download: " << m_file_complete.size() << "/" << m_file_number << "\n";
     }
 
     print_vector(m_file_complete);
@@ -249,13 +257,14 @@ void TPeer::CTesting(){
         cmmd = getch();
         switch(cmmd){
             // Peer Client
+            /*
             case 'G':
             case 'g':{
                 cout << "\nClient: Get Peer List\n";
                 message = PeerToStr(m_peer_info);
                 CConnectAndSend(m_tracker_info,message,"G");
                 break;
-            }
+            }*/
             case 'L':
             case 'l':{
                 cout << "\nClient: Login\n";
@@ -312,7 +321,7 @@ void TPeer::AddBlock(string _key, vector<string> _chunk){
 void TPeer::SUpload(vector<string> _parse){
     if(_parse.size() > 1){
         string _key = _parse[0];
-        cout << "\nServer: Upload " << _key << "\n";
+        cout << "\nServer: Upload\n";
         _parse.erase(_parse.begin());
         cout << "  key: " << _key << "\n";
         AddBlock(_key, _parse);
@@ -330,7 +339,7 @@ void TPeer::CUpload(string _file_key ,string _file_body){
         int mbpp = (int)nchunk.size()%((int)m_neighboring_peers.size()+1);
 
         nbpp += (mbpp == 0)? 0: 1;
-        cout << "each peer receive: " << nbpp << "\n";
+        // cout << "  Each peer receive: " << nbpp << "\n";
 
         vector<string> tmp;
         for(unsigned i=0; i<nbpp; i++){
@@ -452,7 +461,7 @@ void TPeer::SListening(){
 
 void TPeer::AddFile(string _bfile){
     if(_bfile != "Not"){
-        cout << "request: " << _bfile << "\n";
+        // cout << "request: " << _bfile << "\n";
         vector<string> vb = SplitMessage(_bfile,"|");
 
         m_cmutex.lock();
