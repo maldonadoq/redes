@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <algorithm>
 #include <unistd.h>
 #include <string.h>
 #include <thread>
@@ -12,6 +13,8 @@
 #include <map>
 #include <unistd.h>
 #include <math.h>
+#include <utility>
+#include <fstream>
 
 #include "protocol.h"
 #include "peer-info.h"
@@ -20,11 +23,14 @@
 using std::cout;
 using std::vector;
 using std::map;
+using std::sort;
 using std::string;
 using std::to_string;
 using std::thread;
 using std::mutex;
-
+using std::pair;
+using std::make_pair;
+using std::ofstream;
 /*
     Client Testing Commands [Press Key!!]:
         L/l -> Login
@@ -60,6 +66,7 @@ private:
     static void SUpload(vector<string>);
     static void SDownload(vector<string>);
     static void SDownloadComplete(string);
+    static void SSave(string);
 
     // Client
     static void CConnectAndSend(TPeerInfo, string, string);
@@ -201,7 +208,29 @@ void TPeer::SDownloadComplete(string _key){
         cout << "  Download: " << m_file_complete.size() << "/" << m_file_number << "\n";
     }
 
-    print_vector(m_file_complete);
+    SSave(_key);
+    // print_vector(m_file_complete);
+}
+
+void TPeer::SSave(string _key){
+    vector<string> block;
+    vector<pair<int, int> > block_pair;
+    for(unsigned i=0; i<m_file_complete.size(); i++){
+        block = SplitMessage(m_file_complete[i], "/");
+        m_file_complete[i] = block[2];
+
+        block_pair.push_back(make_pair(stoi(block[0]), i));
+    }
+
+    sort(block_pair.begin(), block_pair.end(), compare_pair);
+    
+    ofstream file("download/" + _key);
+
+    for(unsigned i=0; i<block_pair.size(); i++){
+        file << m_file_complete[block_pair[i].second];
+    }
+
+    file.close();
 }
 
 void TPeer::CConnectAndSend(TPeerInfo _machine,
