@@ -15,9 +15,11 @@
 #include <boost/algorithm/string.hpp> 
 
 #include <fstream>
+#include <utility>
 #include "peer-info.h"
 
 using std::cout;
+using std::pair;
 using std::string;
 using std::vector;
 using std::to_string;
@@ -99,10 +101,6 @@ static string ReadFile(string filename){
     return ret;
 }
 
-void SaveFile(string _text){
-    
-}
-
 vector<string> SplitMessage(string _message, string _separator){
     vector<string> result; 
     boost::split(result, _message, boost::is_any_of(_separator));
@@ -145,6 +143,10 @@ TPeerInfo MakePeerInfo(vector<string> _parse){
     }
 
     return {"error", -1};
+}
+
+bool compare_pair(pair<int, int> a, pair<int, int> b) { 
+    return (a.first < b.first); 
 }
 
 #endif
