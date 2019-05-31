@@ -72,7 +72,7 @@ vector<string> SplitText(string _text, unsigned _size){
 
     int k = 0;
     for(unsigned i=0; i<_text.size(); i+=_size){
-        mssg = to_string(k)+"-"+to_string(c)+"-";
+        mssg = to_string(k)+"/"+to_string(c)+"/";
         for(unsigned j=0; j<_size and (i + j)<_text.size(); j++){
             mssg += _text[i+j];
         }
