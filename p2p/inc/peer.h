@@ -21,6 +21,7 @@
 #include "utils.h"
 
 using std::cout;
+using std::cin;
 using std::vector;
 using std::map;
 using std::sort;
@@ -72,7 +73,7 @@ private:
     static void CConnectAndSend(TPeerInfo, string, string);
     static void CTesting();
     static void CUpload(string, string);
-    static void CDownload(string);
+    static void CDownload(string, int);
 
     void Init();
     static void PrintPeers();
@@ -139,8 +140,11 @@ void TPeer::Init(){
     cout << "Peer-Server Created!\n";
 }
 
-void TPeer::CDownload(string _file){
-    for(unsigned i=0; i<m_neighboring_peers.size(); i++){
+void TPeer::CDownload(string _file, int _number){
+    int ts = m_neighboring_peers.size();
+    // for(int i=0; i<ts and i<_number; i++){
+        // CConnectAndSend(m_neighboring_peers[rand()%ts],_file+"|"+PeerToStr(m_peer_info), "D");
+    for(int i=0; i<ts; i++){
         CConnectAndSend(m_neighboring_peers[i],_file+"|"+PeerToStr(m_peer_info), "D");
     }
 }
@@ -311,6 +315,27 @@ void TPeer::CTesting(){
                 gmutex.unlock();*/
                 break;
             }
+            case 'U':
+            case 'u':{
+                cout << "\nClient: Upload\n";
+                cout << "  File to Load: ";
+                cin >> message;
+
+                tfile = ReadFile("upload/"+message);
+                CUpload(message, tfile);
+                break;
+            }
+            case 'D':
+            case 'd':{
+                cout << "\nClient: Download\n";
+                cout << "  File to Download: ";
+                cin >> message;
+                CDownload(message, 3);
+                m_file_complete.clear();
+                thread tdownload_complete(SDownloadComplete, message);
+                tdownload_complete.detach();
+                break;
+            }
             default:
                 if(cmmd >= '1' and cmmd <= '4'){
                     nfile = cmmd - '0' - 1;
@@ -321,7 +346,7 @@ void TPeer::CTesting(){
                 else if(cmmd >= '5' and cmmd <= '8'){
                     nfile = cmmd - '0' - 5;
                     cout << "\nClient: Download " << files_name[nfile] << "\n";
-                    CDownload(files_name[nfile]);
+                    CDownload(files_name[nfile], 3);
                     m_file_complete.clear();
                     thread tdownload_complete(SDownloadComplete, files_name[nfile]);
                     tdownload_complete.detach();
@@ -453,7 +478,7 @@ void TPeer::SListening(){
                 }
                 case 'K':
                 case 'k':{
-                    cout << "\nServer: Keep Alive\n";
+                    // cout << "Server: Keep Alive\n";
                     message = PeerToStr(m_peer_info);
                     CConnectAndSend(m_tracker_info,message,"K");
                     break;
@@ -556,8 +581,3 @@ TPeer::~TPeer(){
 }
 
 #endif
-
-
-/*
-    Warning: File 1 don't Download Completely!!
-*/
