@@ -1,0 +1,4 @@
+Quantum internet: A vision for the road ahead
+
+Abstract
+	The internet—a vast network that enables simultaneous long-range classical communication—has had a revolutionary impact on our world. The vision of a quantum internet is to fundamentally enhance internet technology by enabling quantum communication between any two points on Earth. Such a quantum internet may operate in parallel to the internet that we have today and connect quantum processors in order to achieve capabilities that are provably impossible by using only classical means. Here, we propose stages of development toward a full-blown quantum internet and highlight experimental and theoretical progress needed to attain them.
