@@ -41,7 +41,7 @@ using std::ofstream;
 
 std::mutex  gmutex;
 
-const string files_name[6] = {"file1.txt", "file2.txt", "file3.txt", "file4.txt"};
+const string files_name[6] = {"autoencoder.txt", "behavior.txt", "quantum.txt", "segmentation.txt"};
 class TPeer{
 private:
     static map<string, vector<string> > m_chunk_files;
