@@ -113,6 +113,15 @@ TPeer::TPeer(string _tracker_ip, int _tracker_port, int _bits_size){
 
     // Server
     m_peer_info     = {getIPAddress(), getpid()};
+
+    // cout << "ip: " << m_peer_info.m_ip << "\n";
+    // cout << "ip: ";
+    // string ipo_tmp;
+    
+    // cin >> ipo_tmp;
+
+    // m_peer_info.m_ip = ipo_tmp;
+
     this->m_peer_server_sock = socket(AF_INET, SOCK_STREAM, 0);
     Init();
 }
@@ -186,10 +195,12 @@ void TPeer::SDownloadComplete(string _key){
     bool state = true, flag = true;
 
     std::map<string, vector<string> >::iterator it;
-    int sleeptime_check = 2000;
+    int sleeptime_check = 500;
     int sleeptime_request = 3*sleeptime_check;
     int sleeptime = 0;
     string temp;
+
+    m_file_number = -1;
 
     while(state){
         std::this_thread::sleep_for(std::chrono::milliseconds(sleeptime_check));
@@ -330,11 +341,18 @@ void TPeer::CTesting(){
             }
             case 'B':
             case 'b':{
-                cout << "\nClient: Upload Block\n";
-                system("gedit /home/maldonado/Network/p2p/upload/temp.txt");
-                vparse = SplitMessage(ReadFile("upload/temp.txt"), "|");
+                cout << "\nClient: Upload Block\n  File: ";
+                cin >> message;
+                vparse = SplitMessage(ReadFile("upload/"+message), "|");
 
                 CUploadBlock(vparse[0], vparse[1]);
+                break;
+            }
+            case 'S':
+            case 's':{
+                cout << "\nClient: Split File\n  Name: ";
+                cin >> message;
+                SplitMessageSave(message, m_chunk_size);
                 break;
             }
             case 'U':
@@ -408,25 +426,28 @@ void TPeer::SUpload(vector<string> _parse){
 }
 
 void TPeer::CUploadBlock(string _file_key ,string _file_body){
-    if(_file_body.size() < m_chunk_size){
+    vector<string> _parse;
+    _parse = SplitMessage(_file_body, "/");
 
-        vector<string> _parse;
-        _parse = SplitMessage(_file_body, "/");
-
-        if(_parse.size() != 3){
-            cout << "    Error: Block Example: 0/4/Hello World\n";
-            return;
-        }
-
-        if(m_neighboring_peers.size() > 0){
-            int tn = rand()%(int)m_neighboring_peers.size();
-            cout << "    Sending to: ";
-            PrintPeer(m_neighboring_peers[tn]);
-            cout << "\n";
-            CConnectAndSend(m_neighboring_peers[tn],_file_key+"|"+_file_body, "U");
+    if(_parse.size() != 3){
+        cout << "    Error: Block Example: 0/4/Hello World\n";
+    }
+    else{
+        // cout << _parse[2] << "\n";
+        if(_parse[2].size() <= m_chunk_size){
+            if(m_neighboring_peers.size() > 0){
+                int tn = rand()%(int)m_neighboring_peers.size();
+                cout << "    Sending to: ";
+                PrintPeer(m_neighboring_peers[tn]);
+                cout << "\n";
+                CConnectAndSend(m_neighboring_peers[tn],_file_key+"|"+_file_body, "U");
+            }
+            else{
+                AddBlock(_file_key, {_file_body});
+            }
         }
         else{
-            cout << "    Error: Block Size > " << m_chunk_size << "\n";
+            cout << "    Error: Chunk Size > " << m_chunk_size << "\n";
         }
     }
 }
@@ -546,7 +567,7 @@ void TPeer::SListening(){
                 }
                 case 'R':
                 case 'r':{
-                    cout << "Server: Receive Download\n";
+                    // cout << "Server: Receive Download\n";
                     AddFile(command.substr(1));
                     break;
                 }

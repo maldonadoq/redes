@@ -23,6 +23,7 @@ using std::pair;
 using std::string;
 using std::vector;
 using std::to_string;
+using std::ofstream;
 
 static struct termios told, tnew;
 
@@ -99,6 +100,21 @@ static string ReadFile(string filename){
     string ret = std::string(vec_buffer.begin(), vec_buffer.end());
     
     return ret;
+}
+
+void SplitMessageSave(string _file, int _size){
+    string msg = ReadFile("upload/"+_file);
+    vector<string> body = SplitText(msg, _size);
+
+    string b;
+    for(unsigned i=0; i<body.size(); i++){
+        b = "upload/block"+to_string(i)+".txt";
+        ofstream file(b);
+        file << _file;
+        file << "|";
+        file << body[i];
+        file.close();
+    }
 }
 
 vector<string> SplitMessage(string _message, string _separator){
