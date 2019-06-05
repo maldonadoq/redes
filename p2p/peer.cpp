@@ -7,7 +7,14 @@ int main(int argc, char const *argv[]){
 	int port = 7777;
 	int bs = 64;
 
-	TPeer *cl = new TPeer(ip, port, bs);
+	TPeer *cl;
+
+	if(argc == 2){
+		cl = new TPeer(ip, port, bs, argv[1]);
+	}
+	else{
+		cl = new TPeer(ip, port, bs);
+	}
 
 	cl->Execute();
 
