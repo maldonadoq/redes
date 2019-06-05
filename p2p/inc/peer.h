@@ -37,6 +37,7 @@ using std::ofstream;
         L/l -> Login
         O/o -> Logout
         G/g -> Get Peer List
+        N7n -> Print Peer List
 */
 
 std::mutex  gmutex;
@@ -82,6 +83,7 @@ private:
     static void AddFile(string);
 public:
     TPeer(string, int, int);
+    TPeer(string, int, int, string);
     TPeer();
     ~TPeer();
 
@@ -114,13 +116,29 @@ TPeer::TPeer(string _tracker_ip, int _tracker_port, int _bits_size){
     // Server
     m_peer_info     = {getIPAddress(), getpid()};
 
-    // cout << "ip: " << m_peer_info.m_ip << "\n";
-    // cout << "ip: ";
-    // string ipo_tmp;
-    
-    // cin >> ipo_tmp;
+    PrintPeer(m_peer_info);
+    cout << "\n";
 
-    // m_peer_info.m_ip = ipo_tmp;
+    this->m_peer_server_sock = socket(AF_INET, SOCK_STREAM, 0);
+    Init();
+}
+
+TPeer::TPeer(string _tracker_ip, int _tracker_port, int _bits_size, string _peer_ip){
+    m_state         = true;
+    m_bits_size     = _bits_size;
+    m_chunk_size    = 256;
+
+    m_chunk_files.clear();
+
+    // Client    
+    m_tracker_info  = {_tracker_ip, _tracker_port};    
+
+    // Server
+    m_peer_info.m_port = getpid();
+    m_peer_info.m_ip   = _peer_ip;
+
+    PrintPeer(m_peer_info);
+    cout << "\n";
 
     this->m_peer_server_sock = socket(AF_INET, SOCK_STREAM, 0);
     Init();
@@ -339,6 +357,12 @@ void TPeer::CTesting(){
                 gmutex.unlock();*/
                 break;
             }
+            case 'N':
+            case 'n':{
+                cout << "\nClient: List of Peers\n";
+                PrintPeers();
+                break;
+            }
             case 'B':
             case 'b':{
                 cout << "\nClient: Upload Block\n  File: ";
@@ -536,6 +560,7 @@ void TPeer::SListening(){
                     vparse = SplitMessage(command.substr(1), "|");
                     pinfo = MakePeerInfo(vparse);
                     SPeerJoin(pinfo);
+                    cout << "  " << command.substr(1) << "\n";
                     break;
                 }
                 case 'L':
@@ -544,6 +569,7 @@ void TPeer::SListening(){
                     vparse = SplitMessage(command.substr(1), "|");
                     pinfo = MakePeerInfo(vparse);
                     SPeerLeft(pinfo);
+                    cout << "  " << command.substr(1) << "\n";
                     break;
                 }
                 case 'K':
@@ -628,7 +654,7 @@ void TPeer::SPeerListJoin(vector<string> _parse){
 }
 
 void TPeer::SPeerJoin(TPeerInfo _peer){
-    if(_peer.m_port > 0){
+    if(_peer.m_port > 0){        
         m_neighboring_peers.push_back(_peer);
     }
     else{
@@ -639,6 +665,7 @@ void TPeer::SPeerJoin(TPeerInfo _peer){
 void TPeer::SPeerLeft(TPeerInfo _peer){
     if(_peer.m_port > 0){
         vector<TPeerInfo> peers_tmp;
+
         for(unsigned i=0; i<m_neighboring_peers.size(); i++){
             if(m_neighboring_peers[i].m_port != _peer.m_port){
                 peers_tmp.push_back(m_neighboring_peers[i]);
