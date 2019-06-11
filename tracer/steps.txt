@@ -1,0 +1,68 @@
+router:
+	shutdown
+	set WIC-2T
+
+computer:
+	set ip gateway in computer
+	set ip of the computer
+
+	ping 192.168.1.10
+
+router:
+	go cli 
+	no
+	enable
+	conf t
+	hostname Router0
+	int fa 0/0
+	ip add 192.168.1.1 255.255.255.0
+	no shut
+
+	int ser 0/0
+	ip add 192.168.2.1 255.255.255.0
+	clock rate 128000
+	no shut
+
+	ctrl z
+	ping 192.168.1.10
+
+	show ip int br
+
+router:
+	enable 
+	conf t
+	int ser 0/0
+	ip add 192.168.2.2 255.255.255.0
+	no shut
+
+	hostname Router1
+	int fa 0/0
+	ip add 192.168.3.1 255.255.255.0
+	no shut
+
+server:
+	setting
+	gateway 192.168.3.1
+	set ip 192.168.3.80
+
+router:
+	conf t
+	router rip
+	network 192.168.2.0
+	network 192.168.3.0
+
+	ctrl z
+	show ip route
+
+router:
+	conf t
+	router rip
+	network 192.168.1.0
+	network 192.168.2.0
+
+	ctrl z
+	show ip route
+
+router:
+	ping 192.168.3.80
+	ping 192.168.1.10
