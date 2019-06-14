@@ -66,3 +66,9 @@ router:
 router:
 	ping 192.168.3.80
 	ping 192.168.1.10
+
+router:
+	enable
+	conf t
+	router ospf 1
+	network 10.0.0.0 0.0.63.255 area 0
