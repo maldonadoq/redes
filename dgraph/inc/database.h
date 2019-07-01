@@ -14,6 +14,7 @@ using std::cout;
 
 vector<vector<string> > result_select;
 vector<string> tmp;
+bool header;
 
 inline bool exists(const string& name){
 	struct stat buffer;
@@ -23,21 +24,27 @@ inline bool exists(const string& name){
 // to select
 static int callback(void* data, int argc, char** argv, char** azColName){
 	int i;
-	// fprintf(stderr, "%s: ", (const char*)data);
-	// printf("\n");
-	tmp.clear();
-	for (i = 0; i < argc; i++) {
-		// printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
+
+	if(header){
+		tmp.clear();
+		tmp.resize(argc);
+
+		for(i=0; i<argc; i++)
+			tmp[i] = azColName[i];
+
+		result_select.push_back(tmp);
+		header = false;
+	}
+
+	for(i=0; i<argc; i++){
 		if(argv[i]){
-			tmp.push_back(argv[i]);
+			tmp[i] = argv[i];
 		}
 		else{
-			tmp.push_back("NULL");
+			tmp[i] = "NULL";
 		}
-	}
+	}	
 	result_select.push_back(tmp);
-
-	// printf("\n");
 	return 0;
 }
 
@@ -50,15 +57,11 @@ public:
 	TDatabase();
 	~TDatabase();
 
-	void tcreate_table(string);				// Create Table
-
 	/*
 		CRUD
 	*/
-	bool tinsert(string);								// C
-	bool tupdate(string);								// U
-	bool tdelete(string);								// D 
-	bool tselect(string, vector<vector<string> > &);	// R
+	bool execute(string); 
+	bool execute(string, vector<vector<string> > &);
 };
 
 TDatabase::TDatabase(){
@@ -82,55 +85,28 @@ TDatabase::TDatabase(string _name){
     	}
     	else{
     		cout << "Created Database Successfully!\n";
+			string sql;
+			sql = 	"CREATE TABLE NODE("
+						"ID 		INTEGER PRIMARY KEY AUTOINCREMENT, "
+						"NAME 		TEXT 	NOT NULL UNIQUE, "
+						"ATTRIBUTE 	TEXT"
+					");";
+			execute(sql);
+
+			sql = 	"CREATE TABLE RELATION("
+						"ID 		INTEGER PRIMARY KEY AUTOINCREMENT, "
+						"NAME1 		TEXT                NOT NULL, "
+						"NAME2 		TEXT                NOT NULL"
+					");";
+			execute(sql);
     	}
     }
-
-    string sql;
-    sql = 	"CREATE TABLE NODE("
-				"ID 		INTEGER PRIMARY KEY AUTOINCREMENT, "
-				"NAME 		TEXT 	NOT NULL UNIQUE, "
-				"ATTRIBUTE 	TEXT"
-			");";
-	tcreate_table(sql);
-
-	sql = 	"CREATE TABLE RELATION("
-				"ID 		INTEGER PRIMARY KEY AUTOINCREMENT, "
-				"NAME1 		TEXT                NOT NULL, "
-				"NAME2 		TEXT                NOT NULL"
-			");";
-	tcreate_table(sql);
 }
 
-void TDatabase::tcreate_table(string _sql){
-	char* messaggeError; 
-	int rq = sqlite3_exec(m_sqlite, _sql.c_str(), NULL, 0, &messaggeError); 
-  
-    if (rq != SQLITE_OK) { 
-        cout << messaggeError << "\n";
-        sqlite3_free(messaggeError); 
-    } 
-    else{
-        cout << "Table created Successfully\n";
-    }
-}
-
-bool TDatabase::tinsert(string _sql){
-	char* messaggeError; 
-	int rq = sqlite3_exec(m_sqlite, _sql.c_str(), NULL, 0, &messaggeError); 
-
-    if (rq != SQLITE_OK) { 
-        cout << messaggeError << "\n";
-        sqlite3_free(messaggeError); 
-
-        return false;
-    }
-
-    return true;
-}
-
-bool TDatabase::tselect(string _sql, vector<vector<string> > &_res){
+bool TDatabase::execute(string _sql, vector<vector<string> > &_res){
 	result_select.clear();
 	_res.clear();
+	header = true;
 
 	string data("callback function");
 	int rq = sqlite3_exec(m_sqlite, _sql.c_str(), callback, (void*)data.c_str(), NULL);
@@ -145,20 +121,7 @@ bool TDatabase::tselect(string _sql, vector<vector<string> > &_res){
 	return true;
 }
 
-bool TDatabase::tupdate(string _sql){
-	char* messaggeError; 
-	int rq = sqlite3_exec(m_sqlite, _sql.c_str(), NULL, 0, &messaggeError); 
-
-    if (rq != SQLITE_OK) { 
-        cout << messaggeError << "\n";
-        sqlite3_free(messaggeError); 
-        return false;
-    } 
-
-    return true;
-}
-
-bool TDatabase::tdelete(string _sql){
+bool TDatabase::execute(string _sql){
 	char* messaggeError; 
 	int rq = sqlite3_exec(m_sqlite, _sql.c_str(), NULL, 0, &messaggeError); 
 

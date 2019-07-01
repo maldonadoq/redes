@@ -81,23 +81,22 @@ void TSlave::listening(){
                 case 'i':{
                     vparse = split_message(command.substr(1), "|");
 	    			make_tinfo(vparse, tinfo, sql);
-                    if(m_db->tinsert(sql))
-                        connect_and_send(tinfo, "C", "O", m_bits_size);
+                    if(m_db->execute(sql))
+                        connect_and_send(tinfo, "Create", "O", m_bits_size);
                     else
-                        connect_and_send(tinfo, "C", "E", m_bits_size);
+                        connect_and_send(tinfo, "Create", "E", m_bits_size);
 
                     break;
                 }
-                case 'q':
-                case 'Q':{
+                case 'Q':
+                case 'q':{
                     vparse = split_message(command.substr(1), "|");
                     make_tinfo(vparse, tinfo, sql);
-                    if(m_db->tselect(sql, sresult)){
-                        connect_and_send(tinfo, "Q", "q", m_bits_size);
-                        print_matrix(sresult);
+                    if(m_db->execute(sql, sresult)){
+                        connect_and_send(tinfo, matrix_to_str(sresult, "|", "/"), "q", m_bits_size);
                     }
                     else
-                        connect_and_send(tinfo, "Q", "E", m_bits_size);
+                        connect_and_send(tinfo, "Query", "E", m_bits_size);
                     
                     break;
                 }
@@ -105,10 +104,10 @@ void TSlave::listening(){
                 case 'u':{
                     vparse = split_message(command.substr(1), "|");
                     make_tinfo(vparse, tinfo, sql);
-                    if(m_db->tupdate(sql))
-                        connect_and_send(tinfo, "U", "O", m_bits_size);
+                    if(m_db->execute(sql))
+                        connect_and_send(tinfo, "Update", "O", m_bits_size);
                     else
-                        connect_and_send(tinfo, "U", "E", m_bits_size);
+                        connect_and_send(tinfo, "Update", "E", m_bits_size);
                     
                     break;
                 }
@@ -116,10 +115,10 @@ void TSlave::listening(){
                 case 'd':{
                     vparse = split_message(command.substr(1), "|");
                     make_tinfo(vparse, tinfo, sql);
-                    if(m_db->tinsert(sql))
-                        connect_and_send(tinfo, "D", "O", m_bits_size);
+                    if(m_db->execute(sql))
+                        connect_and_send(tinfo, "Delete", "O", m_bits_size);
                     else
-                        connect_and_send(tinfo, "D", "E", m_bits_size);
+                        connect_and_send(tinfo, "Delete", "E", m_bits_size);
                     
                     break;
                 }

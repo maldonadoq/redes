@@ -5,6 +5,8 @@
 #include <string.h>
 #include <iostream>
 #include <thread>
+#include <mutex>
+#include <condition_variable>
 
 #include "protocol.h"
 #include "utils.h"
@@ -14,6 +16,13 @@ using std::string;
 using std::vector;
 using std::cout;
 using std::cin;
+
+using std::mutex;
+using std::condition_variable;
+using std::unique_lock;
+
+mutex mtx;
+condition_variable cv;
 
 class TFront{
 private:
@@ -88,6 +97,8 @@ void TFront::query(string _query){
 
 	int idx = mhash(m_slaves.size());
 
+	bool state = true;
+
 	switch(_query[0]){
 		case 'i':
 		case 'I':{
@@ -99,7 +110,7 @@ void TFront::query(string _query){
 			else if((parse[1] == "r") or (parse[1] == "R")){
 				sql += "RELATION(NAME1, NAME2) VALUES ('" + parse[2] + "', '" + parse[3] +"');";
 			}
-			connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "I", m_bits_size);
+			connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "I", m_bits_size);			
 			break;
 		}
 		case 'q':
@@ -135,8 +146,29 @@ void TFront::query(string _query){
 			connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "D", m_bits_size);
 			break;
 		}
-		default:
+		case 'a':
+		case 'A':{
+			parse = split_message(_query, " ");
+			sql = "|select * from ";
+
+			if((parse[1] == "n") or (parse[1] == "N")){
+				sql += "NODE;";
+			}
+			else if((parse[1] == "r") or (parse[1] == "R")){
+				sql += "RELATION;";
+			}
+			connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "Q", m_bits_size);
 			break;
+		}
+		default:{
+			state = false;
+			break;
+		}
+	}
+
+	if(state){
+		unique_lock<mutex> lck(mtx);
+    	cv.wait(lck);
 	}
 }
 
@@ -144,9 +176,9 @@ void TFront::talking(){
 	int idx;
 	string comm;
 	while(true){
-		// cout << " sarah: ";
-		getline(cin, comm);
-		query(comm);
+		cout << " sarah: ";
+		getline(cin, comm);		
+		query(comm);		
 	}
 }
 
@@ -167,22 +199,24 @@ void TFront::listening(){
             switch(command[0]){
                 case 'O':
                 case 'o':{
-                    cout << command << "\n";
+					cout << "   " << command.substr(1) << " : Ok!\n";
                     break;
                 }
                 case 'E':
                 case 'e':{
-                    cout << command << "\n";
+                    cout << "   " << command.substr(1) << ": Error!\n";
                     break;
                 }
                 case 'Q':
                 case 'q':{
-                    cout << command << "\n";
+                    cout << "   Query: Ok!\n";
+					str_to_matrix(command.substr(1), "|", "/", "    ");
                     break;
                 }
                 default:
                     break;
             }
+			cv.notify_all();
         }
         shutdown(tconn.sock, SHUT_RDWR);
         close(tconn.sock);

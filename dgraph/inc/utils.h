@@ -97,4 +97,38 @@ void print_matrix(vector<vector<string> > &_mat){
     }
 }
 
+string matrix_to_str(vector<vector<string> > &_mat, string _sr, string _sc){
+    string all = "";
+    string sub = "";
+
+    for(unsigned i=0; i<_mat.size(); i++){
+        sub = "";
+        for(unsigned j=0; j<_mat[i].size(); j++){
+            sub += _sc + _mat[i][j];
+        }
+        
+        all += _sr + sub.substr(1);
+    }
+
+    if(all == ""){
+        all = _sr + "Nothing";
+    }
+
+    return all.substr(1);
+}
+
+void str_to_matrix(string _mat, string _sr, string _sc, string _iden){
+    vector<string> rows = split_message(_mat, _sr);
+    vector<string> cols;
+
+    for(unsigned i=0; i<rows.size(); i++){
+        cols = split_message(rows[i], _sc);
+        cout << _iden;
+        for(unsigned j=0; j<cols.size(); j++){
+            cout << cols[j] << " ";
+        }
+        cout << "\n";
+    }
+}
+
 #endif
