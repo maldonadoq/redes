@@ -86,7 +86,7 @@ void TFront::init(){
 }
 
 void TFront::set_slaves(){
-	/*int ns;
+	int ns;
 	cout << "Slaves Number: "; cin >> ns;
 
 	int port;
@@ -94,12 +94,13 @@ void TFront::set_slaves(){
 	for(int i=0; i<ns; i++){
 		cout << "  Slave " << i+1 << "\n";
 		cout << "    Port: "; cin >> port;
-		cout << "    Ip: "; cin >> ip; cout << "\n";
+		cout << "    Ip: "; cin >> ip;
+		cout << "\n";
 		m_slaves.push_back({port, ip});
-	}*/
+	}
 
-	m_slaves.push_back({8000, "127.0.0.1"});
-	m_slaves.push_back({8004, "127.0.0.1"});
+	// m_slaves.push_back({8000, "127.0.0.1"});
+	// m_slaves.push_back({8004, "127.0.0.1"});
 }
 
 void TFront::query(string _query){
@@ -112,6 +113,9 @@ void TFront::query(string _query){
 
 	if((_query == "exit") or (_query =="Exit") or (_query == "q")){
 		exit(0);
+	}
+	else if(_query == ""){
+		state = false;
 	}
 	else{
 		parse = split_message(_query, " ");
@@ -297,6 +301,7 @@ void TFront::query(string _query){
 void TFront::talking(){
 	int idx;
 	string comm;
+	comm = "";
 	while(true){
 		cout << " sarah: ";
 		getline(cin, comm);		
