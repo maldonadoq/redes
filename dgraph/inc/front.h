@@ -5,6 +5,7 @@
 #include <string.h>
 #include <iostream>
 #include <thread>
+#include <utility>
 #include <mutex>
 #include <condition_variable>
 
@@ -15,6 +16,7 @@ using std::thread;
 using std::string;
 using std::vector;
 using std::cout;
+using std::pair;
 using std::cin;
 
 using std::mutex;
@@ -29,7 +31,10 @@ private:
 	static int m_bits_size;
 	static vector<TInfo> m_slaves;		// slaves disponible
 	static TInfo m_info;				// info [port, ip]
-	static TAddress m_conn;			// address [fd, addr]
+	static TAddress m_conn;				// address [fd, addr]
+	static int m_deep;
+	static int m_intermedium;
+	static vector<pair<string, string> > result_deep;	// nodes intermedium
 
 	static void talking();
 	static void query(string);
@@ -45,6 +50,10 @@ public:
 	void run();
 };
 
+vector<pair<string, string> > 	TFront::result_deep;
+
+int 			TFront::m_deep;
+int 			TFront::m_intermedium;
 int 			TFront::m_bits_size;
 vector<TInfo>	TFront::m_slaves;
 TInfo 			TFront::m_info;
@@ -54,6 +63,8 @@ TFront::TFront(int _port, string _ip){
 	this->m_bits_size = 64;
 	this->m_info = {_port, _ip};
 	this->m_conn.sock = socket(AF_INET, SOCK_STREAM, 0);
+	this->m_deep = 0;
+	this->m_intermedium = 0;
 }
 
 void TFront::init(){
@@ -95,74 +106,185 @@ void TFront::query(string _query){
 	vector<string> parse;
 	string sql;
 
-	int idx = mhash(m_slaves.size());
+	int idx;
 
 	bool state = true;
 
-	switch(_query[0]){
-		case 'i':
-		case 'I':{
-			parse = split_message(_query, " ");
-			sql = "|insert into ";
-			if((parse[1] == "n") or (parse[1] == "N")){
-				sql += "NODE(NAME, ATTRIBUTE) VALUES ('" + parse[2] + "', '" + parse[3] +"');";
-			}
-			else if((parse[1] == "r") or (parse[1] == "R")){
-				sql += "RELATION(NAME1, NAME2) VALUES ('" + parse[2] + "', '" + parse[3] +"');";
-			}
-			connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "I", m_bits_size);			
-			break;
-		}
-		case 'q':
-		case 'Q':{
-			parse = split_message(_query, " ");
-			sql = "|select * from ";
-			if((parse[1] == "n") or (parse[1] == "N")){
-				sql += "NODE where NAME = '" + parse[2] + "';";
-			}
-			else if((parse[1] == "r") or (parse[1] == "R")){
-				sql += "RELATION where NAME1 = '" + parse[2] + "';";
-			}
-			connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "Q", m_bits_size);
-			break;
-		}
-		case 'u':
-		case 'U':{
-			parse = split_message(_query, " ");
-			sql = "|update NODE SET ATTRIBUTE = '" + parse[2] + "' where NAME = '" + parse[1] + "';";
-			connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "U", m_bits_size);
-			break;
-		}
-		case 'd':
-		case 'D':{
-			parse = split_message(_query, " ");
-			sql = "|delete from ";
-			if((parse[1] == "n") or (parse[1] == "N")){
-				sql += "NODE where NAME = '" + parse[2] + "';";
-			}
-			else if((parse[1] == "r") or (parse[1] == "R")){
-				sql += "RELATION where NAME1 = '" + parse[2] + "' and NAME2 = '" + parse[3] + "';";
-			}
-			connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "D", m_bits_size);
-			break;
-		}
-		case 'a':
-		case 'A':{
-			parse = split_message(_query, " ");
-			sql = "|select * from ";
+	if((_query == "exit") or (_query =="Exit") or (_query == "q")){
+		exit(0);
+	}
+	else{
+		parse = split_message(_query, " ");
 
-			if((parse[1] == "n") or (parse[1] == "N")){
-				sql += "NODE;";
+		switch(parse.size()){
+			case 2:{
+				switch(_query[0]){
+					case 'a':
+					case 'A':{
+						idx = mhash(m_slaves.size());
+						sql = "|select * from ";
+						if((parse[1] == "n") or (parse[1] == "N")){
+							sql += "NODE;";
+							connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "Q", m_bits_size);
+						}
+						else if((parse[1] == "r") or (parse[1] == "R")){
+							sql += "RELATION;";
+							connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "Q", m_bits_size);
+						}
+						else{
+							cout << "   Error: [A N] or [A R]\n";
+							state = false;
+						}
+						break;
+					}
+					default:{
+						cout << "   Error: 2 -> [A]\n";
+						state = false;
+						break;
+					}
+				}
+				break;
 			}
-			else if((parse[1] == "r") or (parse[1] == "R")){
-				sql += "RELATION;";
+			case 3:{
+				switch(_query[0]){
+					case 'q':
+					case 'Q':{
+						idx = mhash(parse[2], m_slaves.size());
+						sql = "|select * from ";
+						if((parse[1] == "n") or (parse[1] == "N")){
+							sql += "NODE where NAME = '" + parse[2] + "';";
+							connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "Q", m_bits_size);
+						}
+						else if((parse[1] == "r") or (parse[1] == "R")){
+							sql += "RELATION where NAME1 = '" + parse[2] + "';";
+							connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "Q", m_bits_size);
+						}
+						else{
+							cout << "   Error: [Q N X] or [Q R X]\n";
+							state = false;
+						}
+						break;
+					}
+					case 'd':
+					case 'D':{
+						idx = mhash(parse[2], m_slaves.size());
+						if((parse[1] == "n") or (parse[1] == "N")){
+							sql = "|delete from NODE where NAME = '" + parse[2] + "';";
+							connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "D", m_bits_size);
+						}
+						else{
+							cout << "   Error: [D N X]\n";
+							state = false;
+						}
+						break;
+					}
+					default:{
+						cout << "   Error: 2 -> [Q - S]\n";
+						state = false;
+						break;
+					}
+				}
+				break;
 			}
-			connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "Q", m_bits_size);
-			break;
-		}
-		default:{
-			state = false;
-			break;
+			case 4:{
+				switch(_query[0]){
+					case 'i':
+					case 'I':{
+						idx = mhash(parse[2], m_slaves.size());
+						sql = "|insert into ";
+						if((parse[1] == "n") or (parse[1] == "N")){
+							sql += "NODE(NAME, ATTRIBUTE) VALUES ('" + parse[2] + "', '" + parse[3] +"');";
+							connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "I", m_bits_size);
+						}
+						else if((parse[1] == "r") or (parse[1] == "R")){
+							sql += "RELATION(NAME1, NAME2) VALUES ('" + parse[2] + "', '" + parse[3] +"');";
+							connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "I", m_bits_size);
+						}
+						else{
+							cout << "   Error: [I N X Y] or [I R X Y]\n";
+							state = false;
+						}
+						break;
+					}
+					case 'q':
+					case 'Q':{
+						idx = mhash(parse[2], m_slaves.size());
+						if((parse[1] == "r") or (parse[1] == "R")){
+							m_deep = stoi(parse[3]);
+							m_intermedium = 1;
+							result_deep.clear();
+							result_deep.push_back({"]", parse[2]});
+							sql = "|select * from RELATION where NAME1 = '|" + parse[2];
+							connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "R", m_bits_size);
+						}
+						else{
+							cout << "   Error: [Q R X Y]\n";
+							state = false;
+						}
+						break;
+					}
+					case 'u':
+					case 'U':{
+						idx = mhash(parse[2], m_slaves.size());
+						if((parse[1] == "n") or (parse[1] == "N")){
+							sql = "|update NODE SET ATTRIBUTE = '" + parse[3] + "' where NAME = '" + parse[2] + "';";
+							connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "U", m_bits_size);
+						}
+						else{
+							cout << "   Error: [U N X Y]\n";
+							state = false;
+						}
+						break;
+					}
+					case 'd':
+					case 'D':{
+						idx = mhash(parse[2], m_slaves.size());
+						if((parse[1] == "r") or (parse[1] == "R")){
+							sql = "|delete from RELATION where NAME1 = '" + parse[2] + "' and NAME2 = '" + parse[3] + "';";
+							connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "D", m_bits_size);
+						}
+						else{
+							cout << "   Error: [D R X X]\n";
+							state = false;
+						}
+						break;
+					}
+					default:{
+						cout << "   Error: 4 -> [I - Q - U - D]\n";
+						state = false;
+						break;
+					}
+				}
+				break;
+			}
+			case 5:{
+				switch(_query[0]){
+					case 'u':
+					case 'U':{
+						idx = mhash(parse[2], m_slaves.size());
+						if((parse[1] == "r") or (parse[1] == "R")){
+							sql = "|update RELATION SET NAME2 = '" + parse[4] + "' where NAME1 = '" + parse[2] + "' and NAME2 = '" + parse[3] + "';";
+							connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "U", m_bits_size);
+						}
+						else{
+							cout << "   Error: [U R X Y Z]\n";
+							state = false;
+						}
+						break;
+					}
+					default:{
+						cout << "   Error: 1 -> [U]\n";
+						state = false;
+						break;
+					}
+				}
+				break;
+			}
+			default:{
+				cout << "   Error: Query Structure [X X] - [X X X] - [X X X X] - [X X X X X]\n";
+				state = false;
+				break;
+			}
 		}
 	}
 
@@ -185,7 +307,9 @@ void TFront::talking(){
 void TFront::listening(){
 	socklen_t qsize = sizeof(sockaddr_in);
     TAddress tconn;
-    string command;
+    string command, sql;
+    vector<string> inter_nodes;
+    vector<pair<int, string> > inter_sql;
 
     TProtocol mtcp(m_bits_size);
     TInfo tinfo;
@@ -200,23 +324,57 @@ void TFront::listening(){
                 case 'O':
                 case 'o':{
 					cout << "   " << command.substr(1) << " : Ok!\n";
+					cv.notify_all();
                     break;
                 }
                 case 'E':
                 case 'e':{
                     cout << "   " << command.substr(1) << ": Error!\n";
+                    cv.notify_all();
                     break;
                 }
                 case 'Q':
                 case 'q':{
                     cout << "   Query: Ok!\n";
 					str_to_matrix(command.substr(1), "|", "/", "    ");
+					cv.notify_all();
+                    break;
+                }
+                case 'R':
+                case 'r':{
+                	m_intermedium--;
+                	add_str_to_list(result_deep, inter_nodes, command.substr(1), "|", "/");
+
+                	if(m_intermedium <= 0){
+                		m_deep--;
+                		if(m_deep > 0){
+                			if(inter_nodes.size() == 0){
+                				m_intermedium = -1;
+                				m_deep = -1;
+                				str_to_list(result_deep, "   ");
+                				cv.notify_all();
+                			}
+                			else{
+                				preprocesing(inter_nodes, inter_sql, m_slaves.size());
+                				m_intermedium = inter_sql.size();
+                				for(unsigned i=0; i<inter_sql.size(); i++){
+                					sql = "|select * from RELATION where NAME1 = '" + inter_sql[i].second;
+									connect_and_send(m_slaves[inter_sql[i].first], tinfo_to_str(m_info) + sql, "R", m_bits_size);
+                				}
+                			}
+                			inter_nodes.clear();
+                		}
+                		else{
+                			str_to_list(result_deep, "   ");
+                			cv.notify_all();
+                		}
+                	}
+					// str_to_list(command.substr(1), "|", "    ");
                     break;
                 }
                 default:
                     break;
             }
-			cv.notify_all();
         }
         shutdown(tconn.sock, SHUT_RDWR);
         close(tconn.sock);

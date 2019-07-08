@@ -60,10 +60,14 @@ void TSlave::init(){
 void TSlave::listening(){
     socklen_t qsize = sizeof(sockaddr_in);
     TAddress tconn;
-    string command, sql;
+    string command, sql, tsql;
 
     vector<string> vparse;
     vector<vector<string> > sresult;
+
+    vector<string> tnode;
+    vector<string> tresult;
+
     TInfo tinfo;
     TProtocol mtcp(m_bits_size);    
 
@@ -93,11 +97,34 @@ void TSlave::listening(){
                     vparse = split_message(command.substr(1), "|");
                     make_tinfo(vparse, tinfo, sql);
                     if(m_db->execute(sql, sresult)){
-                        connect_and_send(tinfo, matrix_to_str(sresult, "|", "/"), "q", m_bits_size);
+                        connect_and_send(tinfo, matrix_to_str(sresult, "|", "/"), "Q", m_bits_size);
                     }
                     else
                         connect_and_send(tinfo, "Query", "E", m_bits_size);
                     
+                    break;
+                }
+                case 'R':
+                case 'r':{
+                    vparse = split_message(command.substr(1), "|");
+                    make_tinfo(vparse, tinfo, sql, tnode);
+                    
+                    tresult.clear();
+                    for(unsigned i=0; i<tnode.size(); i++){
+                        tsql = sql + tnode[i] + "';";
+                        // cout << tnode[i] << " ";
+
+                        m_db->execute(tsql, sresult);
+
+                        if(sresult.size() > 1){
+                            for(unsigned j=1; j<sresult.size(); j++){
+                                tresult.push_back(tnode[i] + "/" + sresult[j][2]);
+                            }
+                        }
+                    }
+                    // cout << "\n";
+
+                    connect_and_send(tinfo, list_to_str(tresult, "|") , "R", m_bits_size);
                     break;
                 }
                 case 'U':
