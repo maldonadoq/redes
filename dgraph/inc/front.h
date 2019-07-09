@@ -37,11 +37,12 @@ private:
 	static vector<pair<string, string> > result_deep;	// nodes intermedium
 
 	static void talking();
+	static void load_graph();
 	static void query(string);
 	static void listening();
 
 	void init();
-	void set_slaves();	
+	void set_slaves();
 public:
 	TFront();
 	TFront(int, string);
@@ -86,7 +87,7 @@ void TFront::init(){
 }
 
 void TFront::set_slaves(){
-	int ns;
+	/*int ns;
 	cout << "Slaves Number: "; cin >> ns;
 
 	int port;
@@ -97,10 +98,22 @@ void TFront::set_slaves(){
 		cout << "    Ip: "; cin >> ip;
 		cout << "\n";
 		m_slaves.push_back({port, ip});
-	}
+	}*/
 
-	// m_slaves.push_back({8000, "127.0.0.1"});
-	// m_slaves.push_back({8004, "127.0.0.1"});
+	m_slaves.push_back({8000, "127.0.0.1"});
+	m_slaves.push_back({8004, "127.0.0.1"});
+	m_slaves.push_back({8008, "127.0.0.1"});
+	m_slaves.push_back({8012, "127.0.0.1"});
+}
+
+void TFront::load_graph(){
+	vector<string> vsql = split_message(read_file("db/init.txt"), "\n");
+	string sql;
+	for(uint i=0; i<vsql.size(); i++){
+		sql = vsql[i];
+		cout << i << " ";
+		query(sql);
+	}
 }
 
 void TFront::query(string _query){
@@ -175,6 +188,20 @@ void TFront::query(string _query){
 						if((parse[1] == "n") or (parse[1] == "N")){
 							sql = "|delete from NODE where NAME = '" + parse[2] + "';";
 							connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "D", m_bits_size);
+							unique_lock<mutex> lck(mtx);
+    						cv.wait(lck);
+
+    						/*
+								Falta elimnar las relaciones cuando eliminas un nodo!!
+								Tenemos que buscar el elemento con los que se relaciona y elimnar esos 
+								con el hash!
+    						*/
+
+    						sql = "|delete from RELATION where NAME1 = '" + parse[2] + "';";
+							connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "D", m_bits_size);
+							cv.wait(lck);
+
+							state = false;
 						}
 						else{
 							cout << "   Error: [D N X]\n";
@@ -195,14 +222,23 @@ void TFront::query(string _query){
 					case 'i':
 					case 'I':{
 						idx = mhash(parse[2], m_slaves.size());
-						sql = "|insert into ";
 						if((parse[1] == "n") or (parse[1] == "N")){
-							sql += "NODE(NAME, ATTRIBUTE) VALUES ('" + parse[2] + "', '" + parse[3] +"');";
+							sql = "|insert into NODE(NAME, ATTRIBUTE) VALUES ('" + parse[2] + "', '" + parse[3] +"');";
 							connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "I", m_bits_size);
 						}
 						else if((parse[1] == "r") or (parse[1] == "R")){
-							sql += "RELATION(NAME1, NAME2) VALUES ('" + parse[2] + "', '" + parse[3] +"');";
+							idx = mhash(parse[2], m_slaves.size());
+							sql = "|insert into RELATION(NAME1, NAME2) VALUES ('" + parse[2] + "', '" + parse[3] +"');";
 							connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "I", m_bits_size);
+							unique_lock<mutex> lck(mtx);
+    						cv.wait(lck);
+
+							idx = mhash(parse[3], m_slaves.size());
+							sql = "|insert into RELATION(NAME1, NAME2) VALUES ('" + parse[3] + "', '" + parse[2] +"');";
+							connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "I", m_bits_size);
+							cv.wait(lck);
+
+							state = false;
 						}
 						else{
 							cout << "   Error: [I N X Y] or [I R X Y]\n";
@@ -304,8 +340,14 @@ void TFront::talking(){
 	comm = "";
 	while(true){
 		cout << " sarah: ";
-		getline(cin, comm);		
-		query(comm);		
+		getline(cin, comm);
+
+		if(comm == "random"){
+			load_graph();
+		}
+		else{
+			query(comm);
+		}
 	}
 }
 
@@ -372,6 +414,7 @@ void TFront::listening(){
                 		else{
                 			str_to_list(result_deep, "   ");
                 			cv.notify_all();
+                			inter_nodes.clear();
                 		}
                 	}
 					// str_to_list(command.substr(1), "|", "    ");

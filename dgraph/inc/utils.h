@@ -3,7 +3,9 @@
 
 #include <boost/algorithm/string.hpp> 
 #include <netinet/in.h>
+
 #include <utility>
+#include <fstream>
 
 #include "protocol.h"
 
@@ -99,6 +101,20 @@ vector<string> split_message(string _message, string _separator){
     boost::split(result, _message, boost::is_any_of(_separator));
 
     return result;
+}
+
+static string read_file(string filename){
+    std::ifstream ifs(filename, std::ios::binary|std::ios::ate);
+    std::ifstream::pos_type pos = ifs.tellg();
+
+    std::vector<char>  vec_buffer(pos);
+
+    ifs.seekg(0, std::ios::beg);
+    ifs.read(&vec_buffer[0], pos);
+
+    string ret = std::string(vec_buffer.begin(), vec_buffer.end());
+    
+    return ret;
 }
 
 int mhash(int t){
@@ -223,22 +239,32 @@ void add_str_to_list(vector<pair<string, string> > &_result, vector<string> &_in
     vector<string> cols;
 
     bool t;
-    for(unsigned i=0; i<rows.size(); i++){
+    unsigned i,j;
+    for(i=0; i<rows.size(); i++){
         cols = split_message(rows[i], _sc);
-        t = false;
 
-        for(unsigned j=0; j<_result.size(); j++){
+        t = false;
+        for(j=0; j<_result.size(); j++){
             if(cols[1] == _result[j].second){
                 t = true;
                 break;
             }
         }
-
         if(!t){
             _inter.push_back(cols[1]);
         }
 
-        _result.push_back({cols[0], cols[1]});
+        t = false;
+        for(j=0; j<_result.size(); j++){
+            if(( (cols[0] == _result[j].first) and (cols[1] == _result[j].second) ) or 
+                 ( (cols[1] == _result[j].first) and (cols[0] == _result[j].second) )) {
+                t = true;
+                break;
+            }
+        }
+        if(!t){
+            _result.push_back({cols[0], cols[1]});
+        }
     }
 }
 
@@ -261,6 +287,55 @@ void preprocesing(vector<string> &_inter_node, vector<pair<int, string> > &_inte
         if(tmp[i] != ""){
             _inter_sql.push_back({i, tmp[i]});
         }
+    }
+}
+
+/*
+    Generate graph
+*/
+
+string alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+int idx;
+
+string generate(uint _s){
+    string tmp = "";
+    for(uint i=0; i<_s; i++){
+        idx = rand()%(int)alpha.size();
+        tmp += alpha[idx];
+    }
+
+    return tmp;
+}
+
+bool nfind(vector<string> &_nodes, string _node){
+    for(uint i=0; i<_nodes.size(); i++){
+        if(_nodes[i] == _node){
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool rfind(vector<pair<string, string> > &_relations, string _a, string _b){
+    for(uint i=0; i<_relations.size(); i++){
+        if((_relations[i].first == _a) and (_relations[i].second == _b)){
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void print_vect(vector<string> &_nodes){
+    for(uint i=0; i<_nodes.size(); i++){
+        cout << _nodes[i] << "\n";
+    }
+}
+
+void print_vect(vector<pair<string, string> > &_relations){
+    for(uint i=0; i<_relations.size(); i++){
+        cout << _relations[i].first << " -> " << _relations[i].second << "\n";
     }
 }
 
