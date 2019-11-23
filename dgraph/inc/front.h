@@ -102,8 +102,6 @@ void TFront::set_slaves(){
 
 	m_slaves.push_back({8000, "127.0.0.1"});
 	m_slaves.push_back({8004, "127.0.0.1"});
-	m_slaves.push_back({8008, "127.0.0.1"});
-	m_slaves.push_back({8012, "127.0.0.1"});
 }
 
 void TFront::load_graph(){
