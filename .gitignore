@@ -1,3 +1,6 @@
+# Config
+dgraph/db/config.txt
+
 # Visual Code
 dgraph/.vscode/*
 .vscode/*
