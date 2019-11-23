@@ -79,7 +79,7 @@ void TSlave::listening(){
             // printf("address: %s\n", inet_ntoa(tconn.addr.sin_addr));
             // printf("port %d\n", ntohs(tconn.addr.sin_port));
             command = mtcp.receiving(tconn.sock);
-            // cout << command << "\n";
+            cout << command << "\n";
             switch(command[0]){
                 case 'I':
                 case 'i':{

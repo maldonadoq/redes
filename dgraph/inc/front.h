@@ -4,6 +4,7 @@
 #include <vector>
 #include <string.h>
 #include <iostream>
+#include <fstream>
 #include <thread>
 #include <utility>
 #include <mutex>
@@ -12,6 +13,7 @@
 #include "protocol.h"
 #include "utils.h"
 
+using std::ofstream;
 using std::thread;
 using std::string;
 using std::vector;
@@ -43,6 +45,8 @@ private:
 
 	void init();
 	void set_slaves();
+	void load_config();
+	void save_config();
 public:
 	TFront();
 	TFront(int, string);
@@ -87,25 +91,61 @@ void TFront::init(){
 }
 
 void TFront::set_slaves(){
-	/*int ns;
-	cout << "Slaves Number: "; cin >> ns;
 
-	int port;
-	string ip;
+	bool ce = util_exists("db/config.txt");
+
+	if(ce){
+		cout << "Loading config\n";
+		load_config();
+	}
+	else{
+		int ns;
+		cout << "Slaves Number: "; cin >> ns;
+
+		int port;
+		string ip;
+		for(int i=0; i<ns; i++){
+			cout << "  Slave " << i+1 << "\n";
+			cout << "    Port: "; cin >> port;
+			cout << "    Ip: "; cin >> ip;
+			cout << "\n";
+
+			m_slaves.push_back({port, ip});
+		}
+		save_config();
+	}
+
+	/*m_slaves.push_back({8000, "127.0.0.1"});
+	m_slaves.push_back({8004, "127.0.0.1"});*/
+}
+
+void TFront::save_config(){
+	ofstream config("db/config.txt");
+	int ns = (int)m_slaves.size();
 	for(int i=0; i<ns; i++){
-		cout << "  Slave " << i+1 << "\n";
-		cout << "    Port: "; cin >> port;
-		cout << "    Ip: "; cin >> ip;
-		cout << "\n";
-		m_slaves.push_back({port, ip});
-	}*/
+		if(i != ns-1){
+			config << tinfo_to_str(m_slaves[i]) << "\n";
+		}
+		else{
+			config << tinfo_to_str(m_slaves[i]);
+		}
+	}
 
-	m_slaves.push_back({8000, "127.0.0.1"});
-	m_slaves.push_back({8004, "127.0.0.1"});
+	config.close();
+}
+
+void TFront::load_config(){
+	vector<string> tconf = split_message(read_file("db/config.txt"), "\n");
+	vector<string> infor;
+
+	for(unsigned i=0; i<tconf.size(); i++){
+		infor = split_message(tconf[i], "|");
+		m_slaves.push_back({stoi(infor[0]), infor[1]});
+	}
 }
 
 void TFront::load_graph(){
-	vector<string> vsql = split_message(read_file("db/init.txt"), "\n");
+	vector<string> vsql = split_message(read_file("db/test.txt"), "\n");
 	string sql;
 	for(uint i=0; i<vsql.size(); i++){
 		sql = vsql[i];
@@ -136,15 +176,36 @@ void TFront::query(string _query){
 				switch(_query[0]){
 					case 'a':
 					case 'A':{
-						idx = mhash(m_slaves.size());
 						sql = "|select * from ";
-						if((parse[1] == "n") or (parse[1] == "N")){
-							sql += "NODE;";
-							connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "Q", m_bits_size);
-						}
-						else if((parse[1] == "r") or (parse[1] == "R")){
-							sql += "RELATION;";
-							connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "Q", m_bits_size);
+						bool bnode = (parse[1] == "n") or (parse[1] == "N");
+						bool brela = (parse[1] == "r") or (parse[1] == "R");
+
+						if(bnode or brela){
+							if(bnode)		sql += "NODE;";
+							else if(brela)	sql += "RELATION;";
+
+							if(m_slaves.size() == 0){
+								cout << "   Empty";
+								state = false;
+							}
+							else if(m_slaves.size() == 1){
+								connect_and_send(m_slaves[0], tinfo_to_str(m_info) + sql, "Q", m_bits_size);
+							}
+							else{
+								unsigned tfin = m_slaves.size()-1;
+								unique_lock<mutex> lck(mtx);
+								for(unsigned i=0; i<tfin; i++){
+									cout << "  Node " << i << "\n";
+									connect_and_send(m_slaves[i], tinfo_to_str(m_info) + sql, "Q", m_bits_size);
+									cv.wait(lck);
+								}
+
+								cout << "  Node " << tfin << "\n";
+								connect_and_send(m_slaves[tfin], tinfo_to_str(m_info) + sql, "Q", m_bits_size);
+								cv.wait(lck);
+
+								state = false;
+							}
 						}
 						else{
 							cout << "   Error: [A N] or [A R]\n";
@@ -276,10 +337,20 @@ void TFront::query(string _query){
 					}
 					case 'd':
 					case 'D':{
-						idx = mhash(parse[2], m_slaves.size());
 						if((parse[1] == "r") or (parse[1] == "R")){
+							idx = mhash(parse[2], m_slaves.size());
 							sql = "|delete from RELATION where NAME1 = '" + parse[2] + "' and NAME2 = '" + parse[3] + "';";
 							connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "D", m_bits_size);
+							unique_lock<mutex> lck(mtx);
+    						cv.wait(lck);
+
+							idx = mhash(parse[3], m_slaves.size());
+							sql = "|delete from RELATION where NAME1 = '" + parse[3] + "' and NAME2 = '" + parse[2] + "';";
+							connect_and_send(m_slaves[idx], tinfo_to_str(m_info) + sql, "D", m_bits_size);
+							cv.wait(lck);
+
+							state = false;
+
 						}
 						else{
 							cout << "   Error: [D R X X]\n";
@@ -340,7 +411,7 @@ void TFront::talking(){
 		cout << " sarah: ";
 		getline(cin, comm);
 
-		if(comm == "random"){
+		if(comm == "load"){
 			load_graph();
 		}
 		else{
@@ -374,7 +445,7 @@ void TFront::listening(){
                 }
                 case 'E':
                 case 'e':{
-                    cout << "   " << command.substr(1) << ": Error!\n";
+                    cout << "   " << command.substr(1) << " : Error!\n";
                     cv.notify_all();
                     break;
                 }

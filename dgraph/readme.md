@@ -55,6 +55,8 @@ private:
 
 	void init();			// inicializa el cliente [socket]
 	void set_slaves();		// estático - dinámico
+    void load_config();		// cargar configuraciones
+	void save_config();		// guardar configuraciones de los esclavos
 public:
 	TFront();
 	TFront(int, string);
@@ -233,10 +235,10 @@ Tenemos dos modos de ejecución, estático y dinámico. Se puede cambiar esto en
 
 ```bash
 $ # ./slave.out port ip db-name
-$ ./slave.out 8000 127.0.0.1 slave1
+$ ./slave.out 8000 127.0.0.1 slave1.db
   Created Database Successfully!
   --------
-$ ./slave.out 8004 127.0.0.1 slave2
+$ ./slave.out 8004 127.0.0.1 slave2.db
   Created Database Successfully!
 ```
 ##### Cliente/Maestro
@@ -266,19 +268,19 @@ Podemos ejecutar y añadir con N esclavos.
 
 ```bash
 # N = 5
-$ ./slave.out 8000 127.0.0.1 slave1
+$ ./slave.out 8000 127.0.0.1 slave1.db
   Created Database Successfully!  
   --------
-$ ./slave.out 8004 127.0.0.1 slave2
+$ ./slave.out 8004 127.0.0.1 slave2.db
   Created Database Successfully!
   --------
-$ ./slave.out 8008 127.0.0.1 slave3
+$ ./slave.out 8008 127.0.0.1 slave3.db
   Created Database Successfully!
   --------
-$ ./slave.out 8012 127.0.0.1 slave4
+$ ./slave.out 8012 127.0.0.1 slave4.db
   Created Database Successfully!
   --------
-$ ./slave.out 8016 127.0.0.1 slave5
+$ ./slave.out 8016 127.0.0.1 slave5.db
   Created Database Successfully!
 ```
 
@@ -287,17 +289,27 @@ $ ./slave.out 8016 127.0.0.1 slave5
 ```c++
 void TFront::set_slaves(){
 	/*Dinamico*/
-	int ns;
-	cout << "Slaves Number: "; cin >> ns;
+	bool ce = util_exists("db/config.txt");
 
-	int port;
-	string ip;
-	for(int i=0; i<ns; i++){
-		cout << "  Slave " << i+1 << "\n";
-		cout << "    Port: "; cin >> port;
-		cout << "    Ip: "; cin >> ip;
-		cout << "\n";
-		m_slaves.push_back({port, ip});
+	if(ce){
+		cout << "Loading config\n";
+		load_config();
+	}
+	else{
+		int ns;
+		cout << "Slaves Number: "; cin >> ns;
+
+		int port;
+		string ip;
+		for(int i=0; i<ns; i++){
+			cout << "  Slave " << i+1 << "\n";
+			cout << "    Port: "; cin >> port;
+			cout << "    Ip: "; cin >> ip;
+			cout << "\n";
+
+			m_slaves.push_back({port, ip});
+		}
+		save_config();
 	}
     
     /*Estático*/
@@ -408,7 +420,6 @@ Borrar una relación entre 2 nodos
 ### Ejemplo
 
 #### Grafo
-
 ![](images/graph.png)
 
 Grafo simple generado para prueba
@@ -418,7 +429,7 @@ Grafo simple generado para prueba
 Cargaremos el grafo de la imagen a través de nuestro cliente.
 
 ##### Cliente
-Debemos de tener en la carpeta db el archivo init.txt
+Debemos de tener en la carpeta db el archivo test.txt con los siguientes valores.
 
 ```
 I N U 1

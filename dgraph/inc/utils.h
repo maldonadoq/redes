@@ -4,6 +4,7 @@
 #include <boost/algorithm/string.hpp> 
 #include <netinet/in.h>
 
+#include <sys/stat.h>
 #include <utility>
 #include <fstream>
 
@@ -337,6 +338,11 @@ void print_vect(vector<pair<string, string> > &_relations){
     for(uint i=0; i<_relations.size(); i++){
         cout << _relations[i].first << " -> " << _relations[i].second << "\n";
     }
+}
+
+inline bool util_exists(const string& name){
+	struct stat buffer;
+	return (stat (name.c_str(), &buffer) == 0);
 }
 
 #endif
