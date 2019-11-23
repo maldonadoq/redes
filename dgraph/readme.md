@@ -458,7 +458,7 @@ Ejecutar
 
 ```bash
 $ ./front.out 6666 127.0.0.1
-  sarah: random
+  sarah: load
 ```
 * * *
 [Percy Maldonado Quispe UCSP](https://github.com/maldonadoq)
