@@ -26,9 +26,208 @@ $ make clean
 $ make
 ```
 
+### Código
+
+En esta sección vemos la lógica del código
+
+#### Cliente/Maestro
+
+La parte del cliente y el maestro se encuentra juntos en una clase, lo realizamos así ya que el cliente solo recibe por consola la consulta y esta se la manda al maestro, decidimos juntaros por cuestiones de tiempo.
+
+```c++
+class TFront{
+private:
+	static int m_bits_size;
+	static vector<TInfo> m_slaves;	// esclavos disponibles
+	static TInfo m_info;			// info [puerto, ip]
+	static TAddress m_conn;			// address [fd, addr]
+	
+    /*variables para realizar una consulta con profundidad*/
+    static int m_deep;
+	static int m_intermedium;
+	static vector<pair<string, string> > result_deep;
+
+    /*principales funciones*/
+	static void talking();			// interfaz del cliente
+	static void load_graph();		// carga un grafo de un txt
+	static void query(string);		// realiza la consula
+	static void listening();		// escucha las respuesta de los esclavos
+
+	void init();			// inicializa el cliente [socket]
+	void set_slaves();		// estático - dinámico
+public:
+	TFront();
+	TFront(int, string);
+	~TFront();
+
+	void run();
+};
+```
+
+
+
+#### Esclavo/SQLite
+
+Esclavo
+
+```c++
+class TSlave{
+private:
+	int m_bits_size;
+	TInfo m_info;		// info [port, ip]
+	TAddress m_conn;	// address [fd, addr]
+    TDatabase *m_db;	// SQLite Data Base
+
+	void listening();
+	void init();
+public:
+	TSlave();
+	TSlave(int, string, string);
+	~TSlave();
+
+	void run();
+};
+```
+
+Base de datos sqlite3 en cada esclavo
+
+```c++
+class TDatabase{
+private:
+	sqlite3* m_sqlite;
+	string m_name;
+public:	
+	TDatabase(string);
+	TDatabase();
+	~TDatabase();
+    
+	bool execute(string); 
+	bool execute(string, vector<vector<string> > &);
+};
+```
+
+Al momento de crear un Esclavo, verificamos que no exista una base de datos ya cargada, si no se encuentra, se crea
+
+```c++
+TDatabase::TDatabase(string _name){
+    this->m_name = _name;
+
+	bool de = exists(m_name);
+
+    int rq = 0; 
+    rq = sqlite3_open(m_name.c_str(), &m_sqlite);
+
+    if(rq){
+        cerr << "Error Create Database " << sqlite3_errmsg(m_sqlite) << "\n";
+    }
+    else{
+        if(de){
+            cout << "Database Exists!\n";
+        }
+        else{
+            cout << "Created Database Successfully!\n";
+            string sql;
+            sql = 	"CREATE TABLE NODE("
+                        "ID 		INTEGER PRIMARY KEY AUTOINCREMENT, "
+                        "NAME 		TEXT 	NOT NULL UNIQUE, "
+                        "ATTRIBUTE 	TEXT"
+                	");";
+            execute(sql);
+
+            sql = 	"CREATE TABLE RELATION("
+                        "ID 		INTEGER PRIMARY KEY AUTOINCREMENT, "
+                        "NAME1 		TEXT                NOT NULL, "
+                        "NAME2 		TEXT                NOT NULL"
+                    ");";
+            execute(sql);
+        }
+    }
+}
+```
+
+#### Protocolo
+
+Desarrollamos una clase llamada Protocolo, que no es más que un parseador de una comunicación, envía en paquetes si la información si es mayor de lo que se puede enviar en un paquete, necesita el ip del destino y el numero de bits por paquete.
+
+```c++
+/*
+	1 -> commando				|
+	1 -> bool [body or head]	|
+	2 -> size of message		|_	size = 4
+*/
+
+class TProtocol{
+private:
+	int m_bits_size;	// buffer size
+	int m_bit;			/* example:
+							1-9     -> 1
+							10-99   -> 2
+							100-999 -> 3
+						*/
+
+	vector<string> split_text(string);
+public:
+	TProtocol();
+	TProtocol(int);
+	~TProtocol();
+
+	void sending(string, int, string);
+	string receiving(int);
+};
+```
+
+#### Main
+
+Cliente/Maestro
+
+```c++
+int main(int argc, char const *argv[]){
+
+	int port = 6666;
+	string ip = "127.0.0.1";
+
+	if(argc == 3){
+		port = stoi(argv[1]);
+		ip = argv[2];
+	}
+
+	TFront *cl = new TFront(port, ip);
+
+	cl->run();
+
+	delete cl;
+	return 0;
+}
+```
+
+Esclavo/SQLite
+
+```c++
+int main(int argc, char const *argv[]){
+	int port = 8000;
+	string ip = "127.0.0.1";
+	string db = "db/slave.db";
+
+	if(argc == 4){
+		port = stoi(argv[1]);
+		ip = argv[2];
+		db = "db/" + string(argv[3]);
+	}
+
+	TSlave *sr = new TSlave(port, ip, db);
+
+	sr->run();
+
+	delete sr;
+	return 0;
+}
+```
+
 ### Ejecución
 
-#### Estático [2 Esclavos]
+Tenemos dos modos de ejecución, estático y dinámico. Se puede cambiar esto en la parte del cliente, ya que si es estático, solo se cargan dos esclavos, si deseamos añadir n esclavos, necesitamos la parte dinámica, que en si es un bucle que te pide información de cuantos esclavos quieres, y te pide el puerto y la ip de estas.
+
+#### Estático
 
 ##### Esclavo/SQLite
 
@@ -36,7 +235,6 @@ $ make
 $ # ./slave.out port ip db-name
 $ ./slave.out 8000 127.0.0.1 slave1
   Created Database Successfully!
-  
   --------
 $ ./slave.out 8004 127.0.0.1 slave2
   Created Database Successfully!
@@ -60,7 +258,9 @@ $ ./front.out 6666 127.0.0.1
   sarah: 
 ```
 
-#### Estático [N Esclavos]
+#### Dinámico
+
+Podemos ejecutar y añadir con N esclavos.
 
 ##### Esclavo/SQLite
 
@@ -139,20 +339,6 @@ Insertar una relación nodo-nodo [R]
   sarah: I R Nodo1 Nodo2
 ```
 
-#### Borrar
-
-Insertar un nodo
-
-```bash
-  sarah: I N Name Value
-```
-
-Insertar un nodo
-
-```bash
-  sarah: I N Name Value
-```
-
 #### Selección
 
 Extraer todo los nodos existentes
@@ -178,18 +364,39 @@ Extraer las relaciones de un nodo
   sarah: Q R Nodo
 ```
 
-Extraer todo los nodos
+Extraer las relaciones de un nodo con una profundidad N [Entero]
 
-```bash
-  sarah: A N
+```
+  sarah: Q R Nodo N
 ```
 
-#### Borrado
+#### Actualizar
+
+Actualizar el atributo de un nodo
+
+```bash
+  sarah: U N Nodo Value
+```
+
+Actualizar una relación Nodo1 - Nodo2  a Nodo1 - Nodo3
+
+```bash
+  sarah: U R Nodo1 Nodo2 Nodo3
+```
+
+#### Borrar
+
 Borrar un nodo y sus relaciones
 
 ```bash
   sarah: D N Nodo
 ```
+
+Borrar una relación entre 2 nodos
+```bash
+  sarah: D R Nodo1 Nodo2
+```
+
 #### Salir
 
 ```bash
