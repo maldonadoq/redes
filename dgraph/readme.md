@@ -202,7 +202,7 @@ Borrar un nodo y sus relaciones
 
 #### Grafo
 
-![](/home/maldonado/Network/dgraph/images/graph.png)
+![](images/graph.png)
 
 Grafo simple generado para prueba
 
