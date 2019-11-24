@@ -424,7 +424,7 @@ Borrar una relación entre 2 nodos
 
 Grafo simple generado para prueba
 
-#### Estático
+#### Dinámico
 
 Cargaremos el grafo de la imagen a través de nuestro cliente.
 
@@ -454,11 +454,53 @@ I R E W
 I R X Y
 ```
 
-Ejecutar
+Crearemos 4 esclavos de manera local, todos con la misma ip 127.0.0.1 y con puertos 8000, 8004, 8008 y 8012 respectivamente, en 4 consolas distintas.
+
+```bash
+$ ./slave.out 8000 127.0.0.1 slave1.db
+$ ./slave.out 8004 127.0.0.1 slave2.db
+$ ./slave.out 8008 127.0.0.1 slave3.db
+$ ./slave.out 8012 127.0.0.1 slave4.db
+```
+
+Ejecutamos el cliente, la primera vez nos pedirá ingresar el número de esclavos disponibles, llenamos la información correspondiente. De ahí podemos ingresar los comandos diseñados y explicados previamente.
 
 ```bash
 $ ./front.out 6666 127.0.0.1
-  sarah: load
+```
+
+Cargamos el grafo del archivo db/test.txt
+
+```bash
+  sarah: load		# carga el grafo
+  sarah: A N		# consulta de los nodos existentes
+  sarah: A R		# consulta de las relaciones existentes
+  sarah: Q N A		# consulta de un nodo especifico
+  sarah: Q R A		# consulta las relaciónes del nodo A con profundidad 1
+  sarah: Q R A 4	# consulta las relaciónes del nodo A con profundidad 4
+  sarah: I N H 10	# inserta un nodo nuevo H con atributo 10
+  sarah: I N G 100	# inserta un nodo nuevo G con atributo 100
+  sarah: I R H G	# inserta una relación entre H y G
+  sarah: Q R X 3	# consulta las relaciónes del nodo X con profundidad 3 
+  sarah: I R Y H	# inserta una relación entre Y y H
+  sarah: Q R X 3	# consulta las relaciónes del nodo X con profundidad 3 
+  sarah: Q R A 4 	# consulta las relaciónes del nodo A con profundidad 4
+  sarah: D R A B	# borra la relación entre los nodos A y B
+  sarah: Q R A 4	# consulta las relaciónes del nodo A con profundidad 4
+  sarah: U N A UCSP	# actualiza el atributo del nodo A con UCSP
+  
+  sarah: D N A		# borra nodo A
+  					# falta completar, borra las relaciones salientes de A
+  					# pero no las entrantes hacia A
+  sarah: Q N A		# consulta de un nodo especifico
+  sarah: Q R A		# consulta las relaciónes del nodo A con profundidad 1
+  sarah: Q R B		# consulta las relaciónes del nodo B con profundidad 1
+  
+  # para eliminar un nodo y sus relaciones, podemos hacerlo manualmente
+  sarah: Q R A
+  sarah: D R A X	# X = cada uno de los resultados de la consulta anterior.
+  sarah: D N A 		# borra el nodo A, luego de haber borrado sus relaciones
+  sarah: q			# salimos del programa
 ```
 * * *
 [Percy Maldonado Quispe UCSP](https://github.com/maldonadoq)
