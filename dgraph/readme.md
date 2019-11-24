@@ -1,7 +1,13 @@
 [DGraph]
 ======================
 
-[TOC]
+[comment]: [TOC]
+[Instalación](#instalación)
+[Código](#código)
+[Ejecución](#ejecución)
+[Comandos](#comandos)
+[Ejemplo](#ejemplo)
+[Red](#red)
 
 ### Instalación
 
@@ -335,7 +341,8 @@ $ ./front.out 6666 127.0.0.1
     Ip: 127.0.0.1
 
 ```
-### Comando
+
+### Comandos
 
 #### Insertar
 
@@ -503,4 +510,9 @@ Cargamos el grafo del archivo db/test.txt
   sarah: q			# salimos del programa
 ```
 * * *
+
+### Red
+
+Si deseamos correr este programa de manera distribuida, y en distintas maquinas, necesitamos estar conectados en una misma red, cada maquina tiene sus propias ip's, con eso asignar al momento de ejecutar la ip del cliente y los esclavos es clave.
+
 [Percy Maldonado Quispe UCSP](https://github.com/maldonadoq)
