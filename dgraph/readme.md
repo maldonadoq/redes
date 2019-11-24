@@ -2,12 +2,12 @@
 ======================
 
 [comment]: [TOC]
-[Instalación](#instalación)
-[Código](#código)
-[Ejecución](#ejecución)
-[Comandos](#comandos)
-[Ejemplo](#ejemplo)
-[Red](#red)
+-[Instalación](#instalación)
+-[Código](#código)
+-[Ejecución](#ejecución)
+-[Comandos](#comandos)
+-[Ejemplo](#ejemplo)
+-[Red](#red)
 
 ### Instalación
 
