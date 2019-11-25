@@ -263,7 +263,7 @@ Ejecutar
 ```bash
 $ # ./front.out port ip
 $ ./front.out 6666 127.0.0.1
-  sarah: 
+  query: 
 ```
 
 #### Dinámico
@@ -349,13 +349,13 @@ $ ./front.out 6666 127.0.0.1
 Insertar un nodo [R]
 
 ```bash
-  sarah: I N Nodo Value
+  query: I N Nodo Value
 ```
 
 Insertar una relación nodo-nodo [R]
 
 ```bash
-  sarah: I R Nodo1 Nodo2
+  query: I R Nodo1 Nodo2
 ```
 
 #### Selección
@@ -363,30 +363,30 @@ Insertar una relación nodo-nodo [R]
 Extraer todo los nodos existentes
 
 ```bash
-  sarah: A N
+  query: A N
 ```
 Extraer todo las relaciones existentes
 
 ```bash
-  sarah: A R
+  query: A R
 ```
 
 Extraer información de un nodo en especifico
 
 ```bash
-  sarah: Q N Nodo
+  query: Q N Nodo
 ```
 
 Extraer las relaciones de un nodo
 
 ```bash
-  sarah: Q R Nodo
+  query: Q R Nodo
 ```
 
 Extraer las relaciones de un nodo con una profundidad N [Entero]
 
 ```
-  sarah: Q R Nodo N
+  query: Q R Nodo N
 ```
 
 #### Actualizar
@@ -394,13 +394,13 @@ Extraer las relaciones de un nodo con una profundidad N [Entero]
 Actualizar el atributo de un nodo
 
 ```bash
-  sarah: U N Nodo Value
+  query: U N Nodo Value
 ```
 
 Actualizar una relación Nodo1 - Nodo2  a Nodo1 - Nodo3
 
 ```bash
-  sarah: U R Nodo1 Nodo2 Nodo3
+  query: U R Nodo1 Nodo2 Nodo3
 ```
 
 #### Borrar
@@ -408,20 +408,20 @@ Actualizar una relación Nodo1 - Nodo2  a Nodo1 - Nodo3
 Borrar un nodo y sus relaciones
 
 ```bash
-  sarah: D N Nodo
+  query: D N Nodo
 ```
 
 Borrar una relación entre 2 nodos
 ```bash
-  sarah: D R Nodo1 Nodo2
+  query: D R Nodo1 Nodo2
 ```
 
 #### Salir
 
 ```bash
-  sarah: exit
-  sarah: Exit
-  sarah: q
+  query: exit
+  query: Exit
+  query: q
 ```
 
 ### Ejemplo
@@ -479,35 +479,35 @@ $ ./front.out 6666 127.0.0.1
 Cargamos el grafo del archivo db/test.txt
 
 ```bash
-  sarah: load		# carga el grafo
-  sarah: A N		# consulta de los nodos existentes
-  sarah: A R		# consulta de las relaciones existentes
-  sarah: Q N A		# consulta de un nodo especifico
-  sarah: Q R A		# consulta las relaciónes del nodo A con profundidad 1
-  sarah: Q R A 4	# consulta las relaciónes del nodo A con profundidad 4
-  sarah: I N H 10	# inserta un nodo nuevo H con atributo 10
-  sarah: I N G 100	# inserta un nodo nuevo G con atributo 100
-  sarah: I R H G	# inserta una relación entre H y G
-  sarah: Q R X 3	# consulta las relaciónes del nodo X con profundidad 3 
-  sarah: I R Y H	# inserta una relación entre Y y H
-  sarah: Q R X 3	# consulta las relaciónes del nodo X con profundidad 3 
-  sarah: Q R A 4 	# consulta las relaciónes del nodo A con profundidad 4
-  sarah: D R A B	# borra la relación entre los nodos A y B
-  sarah: Q R A 4	# consulta las relaciónes del nodo A con profundidad 4
-  sarah: U N A UCSP	# actualiza el atributo del nodo A con UCSP
+  query: load		# carga el grafo
+  query: A N		# consulta de los nodos existentes
+  query: A R		# consulta de las relaciones existentes
+  query: Q N A		# consulta de un nodo especifico
+  query: Q R A		# consulta las relaciónes del nodo A con profundidad 1
+  query: Q R A 4	# consulta las relaciónes del nodo A con profundidad 4
+  query: I N H 10	# inserta un nodo nuevo H con atributo 10
+  query: I N G 100	# inserta un nodo nuevo G con atributo 100
+  query: I R H G	# inserta una relación entre H y G
+  query: Q R X 3	# consulta las relaciónes del nodo X con profundidad 3 
+  query: I R Y H	# inserta una relación entre Y y H
+  query: Q R X 3	# consulta las relaciónes del nodo X con profundidad 3 
+  query: Q R A 4 	# consulta las relaciónes del nodo A con profundidad 4
+  query: D R A B	# borra la relación entre los nodos A y B
+  query: Q R A 4	# consulta las relaciónes del nodo A con profundidad 4
+  query: U N A UCSP	# actualiza el atributo del nodo A con UCSP
   
-  sarah: D N A		# borra nodo A
+  query: D N A		# borra nodo A
   					# falta completar, borra las relaciones salientes de A
   					# pero no las entrantes hacia A
-  sarah: Q N A		# consulta de un nodo especifico
-  sarah: Q R A		# consulta las relaciónes del nodo A con profundidad 1
-  sarah: Q R B		# consulta las relaciónes del nodo B con profundidad 1
+  query: Q N A		# consulta de un nodo especifico
+  query: Q R A		# consulta las relaciónes del nodo A con profundidad 1
+  query: Q R B		# consulta las relaciónes del nodo B con profundidad 1
   
   # para eliminar un nodo y sus relaciones, podemos hacerlo manualmente
-  sarah: Q R A
-  sarah: D R A X	# X = cada uno de los resultados de la consulta anterior.
-  sarah: D N A 		# borra el nodo A, luego de haber borrado sus relaciones
-  sarah: q			# salimos del programa
+  query: Q R A
+  query: D R A X	# X = cada uno de los resultados de la consulta anterior.
+  query: D N A 		# borra el nodo A, luego de haber borrado sus relaciones
+  query: q			# salimos del programa
 ```
 * * *
 

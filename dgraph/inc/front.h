@@ -408,7 +408,7 @@ void TFront::talking(){
 	string comm;
 	comm = "";
 	while(true){
-		cout << " sarah: ";
+		cout << " query: ";
 		getline(cin, comm);
 
 		if(comm == "load"){
